@@ -54,7 +54,7 @@ jobs:
                   if tick % 10 == 0 {
                       sys.refresh_cpu(); sys.refresh_memory(); sys.refresh_components();
                       let cpu = sys.global_cpu_info().cpu_usage(); let mem = (sys.used_memory() as f32 / sys.total_memory() as f32) * 100.0;
-                      let temp = sys.components().first().and_then(|c| c.temperature()).unwrap_or(45.0);
+                      let temp = sys.components().first().map(|c| c.temperature()).unwrap_or(45.0);
                       let d_sq = (100.0*20.0*(-chi).exp()).powi(2) + (cpu+mem).powi(2) + (temp-75.0).max(0.0).powi(2) + 1.5f32.powi(2);
                       lambda = (lambda*(-chi).exp() + rho*(d_sq-500.0).max(0.0) + rho*(temp-75.0).max(0.0)).min(100.0);
                       if mem > 85.0 { unsafe { madvise(mem_ptr as *mut c_void, 512*1024*1024, MADV_DONTNEED); } }
