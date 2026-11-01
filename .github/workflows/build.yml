@@ -1,0 +1,137 @@
+name: TianShu OS
+on: [workflow_dispatch]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup & Compile
+        env:
+          RUSTUP_DIST_SERVER: "https://rsproxy.cn"
+        run: |
+          # 1. 配置国内源 (中科大)
+          echo 'Server = https://mirrors.ustc.edu.cn/archlinux/$repo/os/$arch' > /etc/pacman.d/mirrorlist
+          echo '[archlinuxcn]' >> /etc/pacman.conf
+          echo 'Server = https://mirrors.ustc.edu.cn/archlinuxcn/$arch' >> /etc/pacman.conf
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm archiso imagemagick rustup git
+          
+          # 2. 配置 Rust 环境
+          rustup default stable
+          rustup target add x86_64-unknown-linux-musl
+          
+          # 3. 生成天枢核心引擎代码 (两仪四象)
+          mkdir -p core/src
+          cat << 'EOF' > core/Cargo.toml
+          [package]
+          name = "tianshu_core"
+          version = "1.0.1"
+          edition = "2021"
+          [dependencies]
+          libc = "0.2"
+          log = "0.4"
+          env_logger = "0.10"
+          sysinfo = "0.30"
+          ctrlc = "3.4"
+          EOF
+          
+          cat << 'EOF' > core/src/main.rs
+          use libc::{madvise, c_void, MADV_DONTNEED, MAP_FAILED};
+          use std::sync::atomic::{AtomicBool, Ordering};
+          use std::sync::Arc; use std::thread; use std::time::Duration;
+          use sysinfo::{ComponentExt, CpuExt, System, SystemExt};
+          fn main() {
+              let running = Arc::new(AtomicBool::new(true)); let r = running.clone();
+              ctrlc::set_handler(move || { r.store(false, Ordering::SeqCst); }).unwrap();
+              let mut sys = System::new_all();
+              let mem_ptr = unsafe { libc::mmap(std::ptr::null_mut(), 512*1024*1024, libc::PROT_READ | libc::PROT_WRITE, libc::MAP_PRIVATE | libc::MAP_ANONYMOUS, -1, 0) as *mut u8 };
+              let (mut lambda, chi, rho) = (0.0f32, 0.05f32, 0.1f32); let mut tick = 0;
+              while running.load(Ordering::SeqCst) {
+                  thread::sleep(Duration::from_millis(50)); tick += 1;
+                  if tick % 10 == 0 {
+                      sys.refresh_cpu(); sys.refresh_memory(); sys.refresh_components();
+                      let cpu = sys.global_cpu_info().cpu_usage(); let mem = (sys.used_memory() as f32 / sys.total_memory() as f32) * 100.0;
+                      let temp = sys.components().first().and_then(|c| c.temperature()).unwrap_or(45.0);
+                      let d_sq = (100.0*20.0*(-chi).exp()).powi(2) + (cpu+mem).powi(2) + (temp-75.0).max(0.0).powi(2) + 1.5f32.powi(2);
+                      lambda = (lambda*(-chi).exp() + rho*(d_sq-500.0).max(0.0) + rho*(temp-75.0).max(0.0)).min(100.0);
+                      if mem > 85.0 { unsafe { madvise(mem_ptr as *mut c_void, 512*1024*1024, MADV_DONTNEED); } }
+                  }
+              }
+          }
+          EOF
+          
+          # 4. 编译
+          cd core
+          RUSTFLAGS="-C target-cpu=x86-64" cargo build --release --target x86_64-unknown-linux-musl
+          cd ..
+          
+      - name: Assemble ISO
+        run: |
+          # 1. 复制官方模板并注入文件
+          cp -r /usr/share/archiso/configs/releng ./iso-profile
+          mkdir -p ./iso-profile/airootfs/usr/local/bin
+          cp ./core/target/x86_64-unknown-linux-musl/release/tianshu_core ./iso-profile/airootfs/usr/local/bin/
+          
+          # 2. 注入软件列表 (含安装器 archinstall, swayfx, 中文字体等)
+          cat << 'EOF' > ./iso-profile/packages.x86_64
+          base
+          linux
+          linux-lts
+          linux-firmware
+          systemd-boot
+          grub
+          efibootmgr
+          systemd
+          sudo
+          networkmanager
+          swayfx
+          waybar
+          nemo
+          alacritty
+          fcitx5
+          fcitx5-chinese-addons
+          noto-fonts-cjk
+          mesa
+          archinstall
+          EOF
+          
+          # 3. 注入系统服务
+          mkdir -p ./iso-profile/airootfs/etc/systemd/system
+          cat << 'EOF' > ./iso-profile/airootfs/etc/systemd/system/tianshu.service
+          [Unit]
+          Description=TianShu OS Core Engine
+          After=network.target
+          [Service]
+          Type=simple
+          ExecStart=/usr/local/bin/tianshu_core
+          Restart=always
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+          
+          # 4. 编写 Chroot 内执行的初始化脚本
+          mkdir -p ./iso-profile/airootfs/root
+          cat << 'EOF' > ./iso-profile/airootfs/root/customize_airootfs.sh
+          #!/usr/bin/env bash
+          systemctl enable tianshu.service
+          locale-gen
+          EOF
+          chmod +x ./iso-profile/airootfs/root/customize_airootfs.sh
+          
+          # 5. 强制替换引导参数 (UEFI 和 BIOS)
+          sed -i 's/options /options quiet splash loglevel=3 init=\/usr\/local\/bin\/tianshu_core elevator=bfq /' ./iso-profile/efiboot/loader/entries/*.conf
+          sed -i 's/APPEND /APPEND quiet splash loglevel=3 init=\/usr\/local\/bin\/tianshu_core elevator=bfq /' ./iso-profile/syslinux/syslinux.cfg
+          
+      - name: Build ISO
+        run: |
+          mkdir -p /tmp/work /tmp/out
+          mkarchiso -v -w /tmp/work -o /tmp/out ./iso-profile
+          
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TianShu-OS-ISO
+          path: /tmp/out/*.iso
