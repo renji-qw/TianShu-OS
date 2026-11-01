@@ -81,19 +81,18 @@ jobs:
           linux
           linux-lts
           linux-firmware
-          systemd-boot
           grub
           efibootmgr
           systemd
           sudo
           networkmanager
-          swayfx
+          sway
           waybar
           nemo
           alacritty
           fcitx5
           fcitx5-chinese-addons
-          noto-fonts-cjk
+          adobe-source-han-sans-cn-fonts
           mesa
           archinstall
           syslinux
