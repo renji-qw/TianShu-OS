@@ -96,6 +96,7 @@ jobs:
           noto-fonts-cjk
           mesa
           archinstall
+          syslinux
           EOF
           
           # 3. 注入系统服务
