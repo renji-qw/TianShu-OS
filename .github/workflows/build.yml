@@ -89,14 +89,18 @@ jobs:
           cp ./configs/kde/sddm/Main.qml   ./iso-profile/airootfs/usr/share/sddm/themes/tianshu/Main.qml
 
           # 7. 引导：强制 systemd-boot，剔除 init= 与 elevator=bfq
-          sed -i "s|^bootmodes=.*|bootmodes=('uefi-x64.systemd-boot.esp' 'uefi-x64.systemd-boot.eltorito')|" ./iso-profile/profiledef.sh
+          #    releng 的 bootmodes 是多行数组，必须先整块删除再追加单行定义，否则会留下孤立的 ")"
+          sed -i '/^bootmodes=/,/)/d' ./iso-profile/profiledef.sh
+          printf "%s\n" "bootmodes=('uefi-x64.systemd-boot.esp' 'uefi-x64.systemd-boot.eltorito')" >> ./iso-profile/profiledef.sh
           find ./iso-profile/efiboot -type f -name "*.conf" -exec sed -i -E 's/ init=[^ ]*//g; s/ elevator=[^ ]*//g; s/options .*/options quiet splash loglevel=3/' {} +
           if [ -d ./iso-profile/syslinux ]; then
             sed -i -E 's/ init=[^ ]*//g; s/ elevator=[^ ]*//g' ./iso-profile/syslinux/*.cfg || true
           fi
 
-          echo "----- profiledef bootmodes -----"
+          echo "----- profiledef (bootmodes 校验) -----"
           grep -n "bootmodes" ./iso-profile/profiledef.sh
+          bash -n ./iso-profile/profiledef.sh && echo "profiledef.sh 语法 OK"
+          bash -n ./scripts/customize_airootfs.sh && echo "customize_airootfs.sh 语法 OK"
           echo "----- efiboot entries -----"
           grep -rn "options" ./iso-profile/efiboot/ || true
 
