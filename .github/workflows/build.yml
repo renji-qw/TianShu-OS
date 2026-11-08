@@ -49,3 +49,12 @@ jobs:
           path: out/*.iso
           if-no-files-found: error
           retention-days: 7
+     
+     - name: Publish to Release
+  uses: softprops/action-gh-release@v2
+  with:
+    tag_name: v1.0.0-lilac
+    name: TianShu OS v1.0 紫丁香测试版
+    files: /tmp/out/*.iso
+  env:
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
