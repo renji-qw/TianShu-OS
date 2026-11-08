@@ -1,12 +1,14 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
+import QtQuick.Window 2.15 // 引入 Window 模块以获取屏幕尺寸
 
 // TianShu OS — 极简无时钟登录界面（紫罗兰三阶）
 Rectangle {
     id: root
-    width: 1920
-    height: 1080
+    // 动态获取当前屏幕的分辨率，完美适配任何显示器
+    width: Screen.width
+    height: Screen.height
 
     function doLogin() {
         if (userField.text.length > 0 && passField.text.length > 0) {
@@ -14,6 +16,7 @@ Rectangle {
         }
     }
 
+    // 三阶紫罗兰微光渐变
     gradient: Gradient {
         GradientStop { position: 0.0; color: "#E2D0E8" }
         GradientStop { position: 0.55; color: "#D8D1E6" }
@@ -28,9 +31,10 @@ Rectangle {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.verticalCenter: parent.verticalCenter
         anchors.verticalCenterOffset: -parent.height * 0.12
-        color: Qt.rgba(1, 1, 1, 0.18)
+        color: Qt.rgba(1, 1, 1,0.18)
     }
 
+    // 居中悬浮的毛玻璃卡片
     Rectangle {
         id: card
         width: 380
@@ -101,6 +105,7 @@ Rectangle {
         }
     }
 
+    // 错误提示（隐藏在卡片下方）
     Label {
         id: errorLabel
         anchors.top: card.bottom
@@ -111,6 +116,7 @@ Rectangle {
         font.pixelSize: 13
     }
 
+    // 监听 SDDM 状态事件
     Connections {
         target: typeof sddm !== "undefined" ? sddm : null
         function onLoginFailed() {
@@ -126,6 +132,7 @@ Rectangle {
         }
     }
 
+    // 初始化聚焦逻辑
     Component.onCompleted: {
         // 无时钟：界面刻意不渲染任何时间元素
         if (typeof userModel !== "undefined" && userModel.lastUser !== "") {
