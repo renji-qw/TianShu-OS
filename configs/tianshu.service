@@ -1,0 +1,11 @@
+[Unit]
+Description=TianShu OS Core Engine
+After=network.target
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/tianshu_core
+Restart=always
+RestartSec=3
+[Install]
+WantedBy=multi-user.target

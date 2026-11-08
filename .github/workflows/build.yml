@@ -1,5 +1,15 @@
 name: TianShu OS
-on: [workflow_dispatch]
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'core/**'
+      - 'configs/**'
+      - 'scripts/**'
+      - '.github/workflows/build.yml'
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -7,131 +17,100 @@ jobs:
       image: archlinux:latest
       options: --privileged
     steps:
-      - uses: actions/checkout@v4
-      - name: Setup & Compile
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core -> target
+          shared-key: tianshu-musl
+
+      - name: Install Build Dependencies
         env:
           RUSTUP_DIST_SERVER: "https://rsproxy.cn"
         run: |
-          # 1. 配置国内源 (中科大)
+          set -euo pipefail
           echo 'Server = https://mirrors.ustc.edu.cn/archlinux/$repo/os/$arch' > /etc/pacman.d/mirrorlist
-          echo '[archlinuxcn]' >> /etc/pacman.conf
-          echo 'Server = https://mirrors.ustc.edu.cn/archlinuxcn/$arch' >> /etc/pacman.conf
-          pacman -Syu --noconfirm
-          pacman -S --noconfirm archiso imagemagick rustup git base-devel
-          
-          # 2. 配置 Rust 环境
+          printf '\n[archlinuxcn]\nSigLevel = Optional TrustAll\nServer = https://mirrors.ustc.edu.cn/archlinuxcn/$arch\n' >> /etc/pacman.conf
+          pacman-key --init
+          pacman-key --populate archlinux
+          pacman -Syu --noconfirm --disable-download-timeout
+          pacman -S --noconfirm --needed --disable-download-timeout \
+            archiso rustup git base-devel archlinuxcn-keyring
           rustup default stable
           rustup target add x86_64-unknown-linux-musl
-          
-          # 3. 生成天枢核心引擎代码 (两仪四象)
-          mkdir -p core/src
-          cat << 'EOF' > core/Cargo.toml
-          [package]
-          name = "tianshu_core"
-          version = "1.0.1"
-          edition = "2021"
-          [dependencies]
-          libc = "0.2"
-          log = "0.4"
-          env_logger = "0.10"
-          sysinfo = "0.29"
-          ctrlc = "3.4"
-          EOF
-          
-          cat << 'EOF' > core/src/main.rs
-          use libc::{madvise, c_void, MADV_DONTNEED, MAP_FAILED};
-          use std::sync::atomic::{AtomicBool, Ordering};
-          use std::sync::Arc; use std::thread; use std::time::Duration;
-          use sysinfo::{ComponentExt, CpuExt, System, SystemExt};
-          fn main() {
-              let running = Arc::new(AtomicBool::new(true)); let r = running.clone();
-              ctrlc::set_handler(move || { r.store(false, Ordering::SeqCst); }).unwrap();
-              let mut sys = System::new_all();
-              let mem_ptr = unsafe { libc::mmap(std::ptr::null_mut(), 512*1024*1024, libc::PROT_READ | libc::PROT_WRITE, libc::MAP_PRIVATE | libc::MAP_ANONYMOUS, -1, 0) as *mut u8 };
-              let (mut lambda, chi, rho) = (0.0f32, 0.05f32, 0.1f32); let mut tick = 0;
-              while running.load(Ordering::SeqCst) {
-                  thread::sleep(Duration::from_millis(50)); tick += 1;
-                  if tick % 10 == 0 {
-                      sys.refresh_cpu(); sys.refresh_memory(); sys.refresh_components();
-                      let cpu = sys.global_cpu_info().cpu_usage(); let mem = (sys.used_memory() as f32 / sys.total_memory() as f32) * 100.0;
-                      let temp = sys.components().first().map(|c| c.temperature()).unwrap_or(45.0);
-                      let d_sq = (100.0*20.0*(-chi).exp()).powi(2) + (cpu+mem).powi(2) + (temp-75.0).max(0.0).powi(2) + 1.5f32.powi(2);
-                      lambda = (lambda*(-chi).exp() + rho*(d_sq-500.0).max(0.0) + rho*(temp-75.0).max(0.0)).min(100.0);
-                      if mem > 85.0 { unsafe { madvise(mem_ptr as *mut c_void, 512*1024*1024, MADV_DONTNEED); } }
-                  }
-              }
-          }
-          EOF
-          
-          # 4. 编译
+
+      - name: Compile Core
+        env:
+          RUSTUP_DIST_SERVER: "https://rsproxy.cn"
+        run: |
+          set -euo pipefail
           cd core
           RUSTFLAGS="-C target-cpu=x86-64" cargo build --release --target x86_64-unknown-linux-musl
-          cd ..
-          
-      - name: Assemble ISO
+          ls -lh target/x86_64-unknown-linux-musl/release/tianshu_core
+
+      - name: Assemble ISO Profile
         run: |
-          # 1. 复制官方模板并注入文件
+          set -euo pipefail
           cp -r /usr/share/archiso/configs/releng ./iso-profile
+
+          # 1. 内核引擎二进制
           mkdir -p ./iso-profile/airootfs/usr/local/bin
-          cp ./core/target/x86_64-unknown-linux-musl/release/tianshu_core ./iso-profile/airootfs/usr/local/bin/
-          
-          # 2. 注入软件列表 (含安装器 archinstall, swayfx, 中文字体等)
-          cat << 'EOF' > ./iso-profile/packages.x86_64
-          base
-          linux
-          linux-lts
-          linux-firmware
-          grub
-          efibootmgr
-          systemd
-          sudo
-          networkmanager
-          sway
-          waybar
-          nemo
-          alacritty
-          fcitx5
-          fcitx5-chinese-addons
-          adobe-source-han-sans-cn-fonts
-          mesa
-          archinstall
-          syslinux
-          EOF
-          
-          # 3. 注入系统服务
+          cp ./core/target/x86_64-unknown-linux-musl/release/tianshu_core ./iso-profile/airootfs/usr/local/bin/tianshu_core
+          chmod 755 ./iso-profile/airootfs/usr/local/bin/tianshu_core
+
+          # 2. 软件清单（纯拷贝，严禁内联写源码）
+          cp ./configs/packages.x86_64 ./iso-profile/packages.x86_64
+
+          # 3. systemd 服务单元
           mkdir -p ./iso-profile/airootfs/etc/systemd/system
-          cat << 'EOF' > ./iso-profile/airootfs/etc/systemd/system/tianshu.service
-          [Unit]
-          Description=TianShu OS Core Engine
-          After=network.target
-          [Service]
-          Type=simple
-          ExecStart=/usr/local/bin/tianshu_core
-          Restart=always
-          [Install]
-          WantedBy=multi-user.target
-          EOF
-          
-          # 4. 编写 Chroot 内执行的初始化脚本
+          cp ./configs/tianshu.service ./iso-profile/airootfs/etc/systemd/system/tianshu.service
+
+          # 4. chroot 定制脚本
           mkdir -p ./iso-profile/airootfs/root
-          cat << 'EOF' > ./iso-profile/airootfs/root/customize_airootfs.sh
-          #!/usr/bin/env bash
-          systemctl enable tianshu.service
-          locale-gen
-          EOF
+          cp ./scripts/customize_airootfs.sh ./iso-profile/airootfs/root/customize_airootfs.sh
           chmod +x ./iso-profile/airootfs/root/customize_airootfs.sh
-          
-          # 5. 强制替换引导参数 (UEFI 和 BIOS)
-          sed -i 's/options /options quiet splash loglevel=3 init=\/usr\/local\/bin\/tianshu_core elevator=bfq /' ./iso-profile/efiboot/loader/entries/*.conf
-          sed -i 's/APPEND /APPEND quiet splash loglevel=3 init=\/usr\/local\/bin\/tianshu_core elevator=bfq /' ./iso-profile/syslinux/syslinux.cfg
-          
+
+          # 5. 紫罗兰 KDE 配置：先落到 /etc/tianshu，再由脚本铺到 /etc/skel
+          mkdir -p ./iso-profile/airootfs/etc/tianshu/skel/.config
+          mkdir -p ./iso-profile/airootfs/etc/tianshu/skel/.local/share/color-schemes
+          cp ./configs/kde/TianShuPurple.colors ./iso-profile/airootfs/etc/tianshu/skel/.local/share/color-schemes/
+          cp ./configs/kde/TianShuPurple.colors ./iso-profile/airootfs/etc/tianshu/skel/.config/
+          cp ./configs/kde/kwinrc     ./iso-profile/airootfs/etc/tianshu/skel/.config/kwinrc
+          cp ./configs/kde/kdeglobals ./iso-profile/airootfs/etc/tianshu/skel/.config/kdeglobals
+          mkdir -p ./iso-profile/airootfs/etc/tianshu/skel/.config/latte
+          cp ./configs/kde/latte/TianShuViolet.layout ./iso-profile/airootfs/etc/tianshu/skel/.config/latte/
+          cp ./configs/kde/sddm.conf ./iso-profile/airootfs/etc/tianshu/sddm.conf
+
+          # 6. SDDM 主题（无时钟）
+          mkdir -p ./iso-profile/airootfs/usr/share/sddm/themes/tianshu
+          cp ./configs/kde/sddm/theme.conf ./iso-profile/airootfs/usr/share/sddm/themes/tianshu/theme.conf
+          cp ./configs/kde/sddm/Main.qml   ./iso-profile/airootfs/usr/share/sddm/themes/tianshu/Main.qml
+
+          # 7. 引导：强制 systemd-boot，剔除 init= 与 elevator=bfq
+          sed -i "s|^bootmodes=.*|bootmodes=('uefi-x64.systemd-boot.esp' 'uefi-x64.systemd-boot.eltorito')|" ./iso-profile/profiledef.sh
+          find ./iso-profile/efiboot -type f -name "*.conf" -exec sed -i -E 's/ init=[^ ]*//g; s/ elevator=[^ ]*//g; s/options .*/options quiet splash loglevel=3/' {} +
+          if [ -d ./iso-profile/syslinux ]; then
+            sed -i -E 's/ init=[^ ]*//g; s/ elevator=[^ ]*//g' ./iso-profile/syslinux/*.cfg || true
+          fi
+
+          echo "----- profiledef bootmodes -----"
+          grep -n "bootmodes" ./iso-profile/profiledef.sh
+          echo "----- efiboot entries -----"
+          grep -rn "options" ./iso-profile/efiboot/ || true
+
       - name: Build ISO
         run: |
+          set -euo pipefail
           mkdir -p /tmp/work /tmp/out
           mkarchiso -v -w /tmp/work -o /tmp/out ./iso-profile
-          
+          ls -lh /tmp/out
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: TianShu-OS-ISO
           path: /tmp/out/*.iso
+          if-no-files-found: error
+          retention-days: 7

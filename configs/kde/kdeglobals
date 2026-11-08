@@ -1,0 +1,24 @@
+[General]
+ColorScheme=TianShuPurple
+Name=TianShu Purple
+font=Noto Sans CJK SC,10,-1,5,50,0,0,0,0,0
+fixed=Noto Sans Mono,10,-1,5,50,0,0,0,0,0
+smallestReadableFont=Noto Sans CJK SC,8,-1,5,50,0,0,0,0,0
+toolBarFont=Noto Sans CJK SC,9,-1,5,50,0,0,0,0,0
+menuFont=Noto Sans CJK SC,10,-1,5,50,0,0,0,0,0
+desktopFont=Noto Sans CJK SC,10,-1,5,50,0,0,0,0,0
+activeFont=Noto Sans CJK SC,10,-1,5,50,0,0,0,0,0
+
+[KDE]
+AnimationSpeed=1
+LookAndFeelPackage=org.kde.breeze.desktop
+SingleClick=false
+WidgetStyle=Breeze
+ShowIconsInMenus=true
+contrast=4
+
+[Icons]
+Theme=breeze-dark
+
+[UiSettings]
+ColorScheme=TianShuPurple
