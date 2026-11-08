@@ -17,8 +17,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      # 关键：job 级别不再挂 container，第一步跑在宿主机上，
-      # 才能真正释放 runner 预装镜像占用的几十 GB，再把大工程交给 docker。
       - name: Free disk space on host
         run: |
           set -x
@@ -49,12 +47,12 @@ jobs:
           path: out/*.iso
           if-no-files-found: error
           retention-days: 7
-     
-     - name: Publish to Release
-  uses: softprops/action-gh-release@v2
-  with:
-    tag_name: v1.0.0-lilac
-    name: TianShu OS v1.0 紫丁香测试版
-    files: /tmp/out/*.iso
-  env:
-    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.0-lilac
+          name: TianShu OS v1.0 紫丁香测试版
+          files: out/*.iso
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
