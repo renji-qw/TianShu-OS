@@ -37,6 +37,10 @@ jobs:
           ls -lh out/
           df -h /
 
+      # 👇 新增：修复 Docker 产生的 root 权限文件，让 runner 能读取
+      - name: Fix Permissions
+        run: sudo chown -R $(id -u):$(id -g) out/
+
       - name: Extreme Compress ISO
         run: |
           cd out
