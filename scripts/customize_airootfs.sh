@@ -76,4 +76,10 @@ systemctl enable tlp.service
 systemctl enable systemd-zram-setup@zram0.service 2>/dev/null || true
 systemctl enable fstrim.timer 2>/dev/null || true
 
+echo "==> [TianShu] 清理包缓存与构建残留（为 squashfs 腾出空间）"
+rm -rf /var/cache/pacman/pkg/* 2>/dev/null || true
+rm -rf /var/lib/pacman/sync/* 2>/dev/null || true
+rm -rf /root/.cache/* /tmp/* 2>/dev/null || true
+rm -f /etc/pacman.d/mirrorlist.pacnew 2>/dev/null || true
+
 echo "==> [TianShu] 定制完成"

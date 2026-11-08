@@ -129,18 +129,36 @@ jobs:
       - name: Build ISO
         run: |
           set -euo pipefail
-          mkdir -p /tmp/work /tmp/out
-          df -h /tmp
-          mkarchiso -v -w /tmp/work -o /tmp/out ./iso-profile
-          # 只保留 ISO 本身，交卷后清掉中间产物
-          find /tmp/work -mindepth 1 -maxdepth 1 -exec rm -rf {} + || true
-          df -h /tmp
-          ls -lh /tmp/out
+          # 释放容器内包缓存（依赖安装阶段留下的 .pkg.tar.zst）
+          pacman -Scc --noconfirm || true
+          rm -rf /var/cache/pacman/pkg/* 2>/dev/null || true
+
+          echo "===== 磁盘布局 ====="
+          df -h / /tmp /mnt 2>/dev/null || true
+          lsblk -o NAME,SIZE,MOUNTPOINT 2>/dev/null || true
+
+          # 优先使用大容量挂载点（GitHub runner 的 /mnt 通常有数十 GiB）
+          WORKDIR=/tmp/work
+          OUTDIR=/tmp/out
+          if [ -d /mnt ] && [ "$(df --output=avail -k /mnt | tail -1)" -gt 12000000 ]; then
+            WORKDIR=/mnt/work
+            OUTDIR=/mnt/out
+          fi
+          mkdir -p "$WORKDIR" "$OUTDIR"
+          echo "WORKDIR=$WORKDIR OUTDIR=$OUTDIR"
+
+          mkarchiso -v -w "$WORKDIR" -o "$OUTDIR" ./iso-profile
+
+          find "$WORKDIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} + || true
+          df -h / /tmp /mnt 2>/dev/null || true
+          ls -lh /tmp/out /mnt/out 2>/dev/null || true
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: TianShu-OS-ISO
-          path: /tmp/out/*.iso
+          path: |
+            /tmp/out/*.iso
+            /mnt/out/*.iso
           if-no-files-found: error
           retention-days: 7

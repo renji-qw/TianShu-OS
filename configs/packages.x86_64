@@ -1,6 +1,5 @@
 base
 linux
-linux-lts
 linux-firmware
 systemd
 efibootmgr
