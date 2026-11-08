@@ -55,6 +55,10 @@ jobs:
           set -euo pipefail
           cp -r /usr/share/archiso/configs/releng ./iso-profile
 
+          # 0. 给 ISO 自身的 pacman.conf 追加 archlinuxcn（pamac-aur / yay 来源）
+          printf '%s\n' '' '[archlinuxcn]' 'SigLevel = Optional TrustAll' 'Server = https://mirrors.ustc.edu.cn/archlinuxcn/$arch' >> ./iso-profile/pacman.conf
+          tail -n 6 ./iso-profile/pacman.conf
+
           # 1. 内核引擎二进制
           mkdir -p ./iso-profile/airootfs/usr/local/bin
           cp ./core/target/x86_64-unknown-linux-musl/release/tianshu_core ./iso-profile/airootfs/usr/local/bin/tianshu_core
