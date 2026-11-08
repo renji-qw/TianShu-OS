@@ -24,20 +24,22 @@ fn sanitize(v: f32) -> f32 {
 
 /// λ 公式（与原始实现逐字等价，禁止改动数学逻辑）
 /// λ' = λ·e^(-χ) + ρ·max(d²-500, 0) + ρ·max(T-75, 0)
+// 注：Rust 稳定版禁止 #[inline(always)] 与 #[target_feature] 同时使用
+// （rust-lang/rust#145574），此处用 #[inline] 提示内联；派发包装层保留 inline(always)。
 #[target_feature(enable = "avx512f")]
-#[inline(always)]
+#[inline]
 unsafe fn calc_lambda_avx512(lambda: f32, chi: f32, rho: f32, d_sq: f32, temp: f32) -> f32 {
     lambda * (-chi).exp() + rho * (d_sq - 500.0).max(0.0) + rho * (temp - 75.0).max(0.0)
 }
 
 #[target_feature(enable = "avx2")]
-#[inline(always)]
+#[inline]
 unsafe fn calc_lambda_avx2(lambda: f32, chi: f32, rho: f32, d_sq: f32, temp: f32) -> f32 {
     lambda * (-chi).exp() + rho * (d_sq - 500.0).max(0.0) + rho * (temp - 75.0).max(0.0)
 }
 
 #[target_feature(enable = "avx")]
-#[inline(always)]
+#[inline]
 unsafe fn calc_lambda_avx(lambda: f32, chi: f32, rho: f32, d_sq: f32, temp: f32) -> f32 {
     lambda * (-chi).exp() + rho * (d_sq - 500.0).max(0.0) + rho * (temp - 75.0).max(0.0)
 }
