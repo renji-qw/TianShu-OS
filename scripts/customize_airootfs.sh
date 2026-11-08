@@ -2,6 +2,13 @@
 # TianShu OS — airootfs 定制脚本（在 archiso chroot 内以 root 执行）
 set -u
 
+echo "==> [TianShu] 初始化 pacman 密钥环（镜像首次引导时自愈）"
+pacman-key --init >/dev/null 2>&1 || true
+pacman-key --populate archlinux archlinuxcn >/dev/null 2>&1 || true
+if ! command -v sddm >/dev/null 2>&1; then
+    pacman -S --noconfirm --needed --disable-download-timeout sddm sddm-kcm || echo "    sddm 安装跳过"
+fi
+
 echo "==> [TianShu] 中文本地化"
 echo "zh_CN.UTF-8 UTF-8" >> /etc/locale.gen
 locale-gen

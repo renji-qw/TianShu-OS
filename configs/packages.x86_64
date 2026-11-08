@@ -10,8 +10,6 @@ network-manager-applet
 plasma-meta
 konsole
 dolphin
-sddm
-sddm-kcm
 pipewire
 pipewire-pulse
 pipewire-alsa

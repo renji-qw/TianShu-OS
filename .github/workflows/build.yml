@@ -57,7 +57,15 @@ jobs:
 
           # 0. 给 ISO 自身的 pacman.conf 追加 archlinuxcn（pamac-aur / yay 来源）
           printf '%s\n' '' '[archlinuxcn]' 'SigLevel = Optional TrustAll' 'Server = https://mirrors.ustc.edu.cn/archlinuxcn/$arch' >> ./iso-profile/pacman.conf
-          tail -n 6 ./iso-profile/pacman.conf
+          # archiso 禁止自定义 SigLevel，写入后必须删掉该行（PKGEXT 不变，SigLevel 走默认 Optional）
+          sed -i '/archlinuxcn/,/^$/ s/^SigLevel *=.*/# SigLevel removed by archiso requirement/' ./iso-profile/pacman.conf
+          tail -n 8 ./iso-profile/pacman.conf
+
+          # 0.1 空间治理：容器根分区约 14GiB，KDE squashfs 后仍需数 GiB。
+          #     改用 xz 固实压缩（替代 releng 默认的 zstd 高压缩），显著降低镜像与峰值占用。
+          sed -i "s/airootfs_image_tool_options=.*/airootfs_image_tool_options=('-comp' 'xz' '-Xbcj' 'x86' '-b' '1M' '-noD' '-no-duplicates')/" ./iso-profile/profiledef.sh
+          grep -n "airootfs_image_tool_options" ./iso-profile/profiledef.sh
+          df -h /tmp
 
           # 1. 内核引擎二进制
           mkdir -p ./iso-profile/airootfs/usr/local/bin
@@ -108,11 +116,22 @@ jobs:
           echo "----- efiboot entries -----"
           grep -rn "options" ./iso-profile/efiboot/ || true
 
+          # 8. 空间治理：容器根分区约 14GiB，KDE 全家桶 squashfs 后仍需 ~4-5GiB
+          #    关闭 zstd 固实压缩（xz 更快、峰值内存/临时占用更低）
+          sed -i "s/airootfs_image_tool_options=.*/airootfs_image_tool_options=('-comp' 'xz' '-Xbcj' 'x86' '-b' '1M' '-noD' '-no-duplicates')/" ./iso-profile/profiledef.sh
+          grep -n "airootfs_image_tool_options" ./iso-profile/profiledef.sh
+          echo "----- 磁盘空间 -----"
+          df -h /tmp /
+
       - name: Build ISO
         run: |
           set -euo pipefail
           mkdir -p /tmp/work /tmp/out
+          df -h /tmp
           mkarchiso -v -w /tmp/work -o /tmp/out ./iso-profile
+          # 只保留 ISO 本身，交卷后清掉中间产物
+          find /tmp/work -mindepth 1 -maxdepth 1 -exec rm -rf {} + || true
+          df -h /tmp
           ls -lh /tmp/out
 
       - name: Upload Artifact
