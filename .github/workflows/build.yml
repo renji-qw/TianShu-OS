@@ -25,13 +25,24 @@ jobs:
           RUSTUP_DIST_SERVER: "https://rsproxy.cn"
         run: |
           set -euo pipefail
-          echo 'Server = https://mirrors.ustc.edu.cn/archlinux/$repo/os/$arch' > /etc/pacman.d/mirrorlist
-          printf '\n[archlinuxcn]\nSigLevel = Optional TrustAll\nServer = https://mirrors.ustc.edu.cn/archlinuxcn/$arch\n' >> /etc/pacman.conf
+          # 多镜像 + 重试：USTC 从美国 runner 偶尔 10s 超时
+          printf '%s\n' \
+            'Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch' \
+            'Server = https://mirrors.ustc.edu.cn/archlinux/$repo/os/$arch' \
+            'Server = https://mirror.rackspace.com/archlinux/$repo/os/$arch' \
+            > /etc/pacman.d/mirrorlist
+          printf '\n[archlinuxcn]\nSigLevel = Optional TrustAll\nServer = https://mirrors.ustc.edu.cn/archlinuxcn/$arch\nServer = https://mirrors.tuna.tsinghua.edu.cn/archlinuxcn/$arch\n' >> /etc/pacman.conf
           pacman-key --init
           pacman-key --populate archlinux
-          pacman -Syu --noconfirm --disable-download-timeout
-          pacman -S --noconfirm --needed --disable-download-timeout \
-            archiso rustup git base-devel archlinuxcn-keyring
+          for i in 1 2 3; do
+            pacman -Syu --noconfirm --disable-download-timeout && break
+            echo "pacman -Syu 第 $i 次失败，重试..."; sleep 10
+          done
+          for i in 1 2 3; do
+            pacman -S --noconfirm --needed --disable-download-timeout \
+              archiso rustup git base-devel archlinuxcn-keyring && break
+            echo "pacman -S 第 $i 次失败，重试..."; sleep 10
+          done
           # 纯净容器里必须先装好 Rust 工具链，后续 rust-cache 才能执行 rustc -vV
           rustup default stable
           rustup target add x86_64-unknown-linux-musl
@@ -59,9 +70,15 @@ jobs:
           cp -r /usr/share/archiso/configs/releng ./iso-profile
 
           # 0. 给 ISO 自身的 pacman.conf 追加 archlinuxcn（pamac-aur / yay 来源）
-          printf '%s\n' '' '[archlinuxcn]' 'SigLevel = Optional TrustAll' 'Server = https://mirrors.ustc.edu.cn/archlinuxcn/$arch' >> ./iso-profile/pacman.conf
+          printf '%s\n' '' '[archlinuxcn]' 'SigLevel = Optional TrustAll' 'Server = https://mirrors.ustc.edu.cn/archlinuxcn/$arch' 'Server = https://mirrors.tuna.tsinghua.edu.cn/archlinuxcn/$arch' >> ./iso-profile/pacman.conf
           # archiso 禁止自定义 SigLevel，写入后必须删掉该行（PKGEXT 不变，SigLevel 走默认 Optional）
           sed -i '/archlinuxcn/,/^$/ s/^SigLevel *=.*/# SigLevel removed by archiso requirement/' ./iso-profile/pacman.conf
+          # pacstrap 的镜像列表也用多源，避免单点超时
+          printf '%s\n' \
+            'Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch' \
+            'Server = https://mirrors.ustc.edu.cn/archlinux/$repo/os/$arch' \
+            'Server = https://mirror.rackspace.com/archlinux/$repo/os/$arch' \
+            > ./iso-profile/airootfs/etc/pacman.d/mirrorlist 2>/dev/null || true
           tail -n 8 ./iso-profile/pacman.conf
 
           # 0.1 空间治理：容器根分区约 14GiB，KDE squashfs 后仍需数 GiB。
