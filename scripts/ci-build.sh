@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # TianShu OS — CI 构建脚本（在 archlinux:latest 容器内以 root 执行）
-# 由 .github/workflows/build.yml 通过 docker run 调用，工作目录 /work
 set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-/work}"
@@ -46,6 +45,21 @@ echo "==> [CI] 组装 ISO profile"
 rm -rf iso-profile
 cp -r /usr/share/archiso/configs/releng ./iso-profile
 
+# ================= 关键修复：强制替换 ISO 的 pacman 官方源 =================
+echo "==> [CI] 修复 iso-profile 的国内镜像源"
+cat > ./iso-profile/pacman.conf <<'EOF'
+[options]
+HoldPkg = pacman glibc
+Architecture = auto
+SigLevel = Required DatabaseOptional
+LocalFileSigLevel = Optional
+
+[core]
+Server = https://mirrors.ustc.edu.cn/archlinux/$repo/os/$arch
+[extra]
+Server = https://mirrors.ustc.edu.cn/archlinux/$repo/os/$arch
+EOF
+
 # 1. archlinuxcn 仓库（pamac-aur / yay 来源）
 printf '%s\n' '' '[archlinuxcn]' 'SigLevel = Optional TrustAll' \
   'Server = https://mirrors.ustc.edu.cn/archlinuxcn/$arch' \
@@ -78,6 +92,8 @@ cp ./configs/kde/TianShuPurple.colors ./iso-profile/airootfs/etc/tianshu/skel/.c
 cp ./configs/kde/kwinrc     ./iso-profile/airootfs/etc/tianshu/skel/.config/kwinrc
 cp ./configs/kde/kdeglobals ./iso-profile/airootfs/etc/tianshu/skel/.config/kdeglobals
 mkdir -p ./iso-profile/airootfs/etc/tianshu/skel/.config/latte
+cp ./configs/kde/latte/TianShuViolet.layout ./iso-profile/airootfs/etc/tianshu/skel/.config/kdeglobals
+mkdir -p ./iso-profile/airootfs/etc/tianshu/skel/.config/latte
 cp ./configs/kde/latte/TianShuViolet.layout ./iso-profile/airootfs/etc/tianshu/skel/.config/latte/
 cp ./configs/kde/sddm.conf ./iso-profile/airootfs/etc/tianshu/sddm.conf
 
@@ -91,10 +107,10 @@ sed -i '/^bootmodes=/,/)/d' ./iso-profile/profiledef.sh
 printf "%s\n" "bootmodes=('uefi-x64.systemd-boot.esp' 'uefi-x64.systemd-boot.eltorito')" >> ./iso-profile/profiledef.sh
 find ./iso-profile/efiboot -type f -name "*.conf" -exec sed -i -E 's/ init=[^ ]*//g; s/ elevator=[^ ]*//g; s/options .*/options quiet splash loglevel=3/' {} +
 if [ -d ./iso-profile/syslinux ]; then
-  sed -i -E 's/ init=[^ ]*//g; s/ elevator=[^ ]*//g' ./iso-profile/syslinux/*.cfg || true
+  sed -i -E 's/ init=[^ ]*//g; s/ elevator=[^ ]*//g'./iso-profile/syslinux/*.cfg || true
 fi
 
-# 9. squashfs：zstd 低压缩级别 + 1M 块 + noappend（低内存、低临时占用）
+# 9. squashfs：zstd 低压缩级别 + 1M 块 + noappend
 sed -i "s/airootfs_image_tool_options=.*/airootfs_image_tool_options=('-comp' 'zstd' '-Xcompression-level' '3' '-b' '1M' '-noappend')/" ./iso-profile/profiledef.sh
 
 echo "----- 校验 -----"
