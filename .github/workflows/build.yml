@@ -41,11 +41,25 @@ jobs:
           ls -lh out/
           df -h /
 
+      # 👇 新增：在宿主机上用 7z 进行极限二次压缩
+      - name: Extreme Compress ISO
+        run: |
+          sudo apt-get update && sudo apt-get install -y p7zip-full
+          cd out
+          for f in *.iso; do
+            echo "极限压缩 $f..."
+            # 使用 LZMA2 算法，最高压缩级别 9，多线程
+            7z a -t7z -m0=lzma2 -mx=9 -mfb=64 -md=32m -ms=on "${f}.7z" "$f"
+            # 压缩完成后删掉原 ISO，防止占用多余空间
+            rm -f "$f"
+          done
+          ls -lh
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: TianShu-OS-ISO
-          path: out/*.iso
+          path: out/*.7z  # 👈 改为上传 7z 压缩包
           if-no-files-found: error
           retention-days: 7
 
@@ -54,6 +68,6 @@ jobs:
         with:
           tag_name: v1.0.0-lilac
           name: TianShu OS v1.0 紫丁香测试版
-          files: out/*.iso
+          files: out/*.7z  # 👈 改为发布 7z 压缩包
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
