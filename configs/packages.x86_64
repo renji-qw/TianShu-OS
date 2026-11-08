@@ -1,3 +1,4 @@
+# === 核心系统与硬件驱动 ===
 base
 linux
 linux-firmware
@@ -5,28 +6,44 @@ systemd
 efibootmgr
 sudo
 networkmanager
+mesa
+polkit
+xdg-user-dirs
+
+# === KDE 紫罗兰桌面（极简版） ===
 plasma-desktop
 plasma-workspace
 plasma-nm
 plasma-pa
 plasma-integration
+kscreen
 kwin
 breeze
 breeze-icons
 sddm
-konsole
 dolphin
+konsole
+
+# === 声音与多媒体 ===
 pipewire
 pipewire-pulse
 pipewire-alsa
 wireplumber
+
+# === 中文字体与输入法 ===
 fcitx5
 fcitx5-chinese-addons
 fcitx5-configtool
 noto-fonts-cjk
 wqy-zenhei
+
+# === 图形化安装器与生态 ===
+calamares
+pamac-aur
+yay
+base-devel
+
+# === 老机器优化与网络 ===
 zram-generator
 tlp
 reflector
-pamac-aur
-yay
