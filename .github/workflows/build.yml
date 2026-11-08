@@ -1,15 +1,10 @@
 name: TianShu OS
 permissions:
   contents: write
+
+# 👇 只保留 workflow_dispatch，彻底删掉了 push 自动触发
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'core/**'
-      - 'configs/**'
-      - 'scripts/**'
-      - '.github/workflows/build.yml'
 
 jobs:
   build:
@@ -37,7 +32,6 @@ jobs:
           ls -lh out/
           df -h /
 
-      # 👇 新增：修复 Docker 产生的 root 权限文件，让 runner 能读取
       - name: Fix Permissions
         run: sudo chown -R $(id -u):$(id -g) out/
 
