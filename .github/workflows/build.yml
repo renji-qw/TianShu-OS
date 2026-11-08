@@ -18,13 +18,7 @@ jobs:
       options: --privileged
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Rust Cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: core -> target
-          shared-key: tianshu-musl
+        uses: actions/checkout@v5
 
       - name: Install Build Dependencies
         env:
@@ -38,8 +32,17 @@ jobs:
           pacman -Syu --noconfirm --disable-download-timeout
           pacman -S --noconfirm --needed --disable-download-timeout \
             archiso rustup git base-devel archlinuxcn-keyring
+          # 纯净容器里必须先装好 Rust 工具链，后续 rust-cache 才能执行 rustc -vV
           rustup default stable
           rustup target add x86_64-unknown-linux-musl
+          rustc -vV
+          cargo -V
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core -> target
+          shared-key: tianshu-musl
 
       - name: Compile Core
         env:
