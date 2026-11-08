@@ -337,3 +337,36 @@ proprietary programs.  If your program is a subroutine library, you may
 consider it more useful to permit linking proprietary applications with the
 library.  If this is what you want to do, use the GNU Lesser General
 Public License instead of this License.
+================================================================================
+天枢OS 附加授权条款 (Additional Terms under Section 7 of AGPLv3)
+TianShu OS Additional Terms under Section 7 of AGPLv3
+================================================================================
+
+Pursuant to Section 7 of the GNU Affero General Public License v3.0, the following 
+additional terms apply to the software and source code in this repository:
+
+依据 AGPLv3 许可证第 7 条，本仓库的软件与源码附加以下严格条款：
+
+1. 商业闭源豁免 (Commercial Closed-Source Exemption)
+Any Legal Entity (company, corporation, etc.) wishing to use this software in a 
+commercial, closed-source capacity (bypassing the AGPLv3 requirement to open-source 
+their derivative work) MUST purchase a lifetime commercial buyout license.
+The total fee for this license is set at 100 RMB per Legal Entity.
+任何企业或商业实体，若希望将其用于闭源商业环境（即豁免 AGPLv3 的开源传染性），
+必须向原作者购买永久商业买断授权。商业授权费统一定价为 100 元人民币/每实体。
+Contact / 联系方式: Github @renji-qw
+
+2. 绝对禁止 AI/ML 训练 (Prohibition of AI/ML Training)
+No individual, organization, or automated crawler may extract, scrape, compile, 
+or utilize any portion of this repository's source code to train, fine-tune, or 
+evaluate any Machine Learning models, Large Language Models (LLMs), or Generative AI.
+未经原作者明确的书面授权，严禁任何个人、组织或自动化程序抓取、提取本仓库源码，
+用于训练、微调或评估任何机器学习模型、大型语言模型（LLMs）或生成式 AI。
+
+3. 商标权保留 (Trademark Reservation)
+The name "TianShu OS (天枢OS)" and its associated logos are trademarks of the Author. 
+You may not use these trademarks to endorse or promote derivative products without 
+explicit written permission.
+“天枢OS”名称及相关标识为原作者保留商标。未经书面许可，不得使用该名称宣传衍生品。
+
+================================================================================
