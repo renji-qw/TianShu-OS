@@ -13,6 +13,6 @@ ctrlc = "3.4"
 [profile.release]
 lto = "fat"
 codegen-units = 1
-panic = "abort"
 opt-level = 3
 strip = true
+# 注意：删掉了 panic = "abort"，为了保证 main.rs 里的 catch_unwind 能够正常工作！
