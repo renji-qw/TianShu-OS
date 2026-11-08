@@ -1,11 +1,22 @@
 [Unit]
 Description=TianShu OS Core Engine
 After=network.target
+
 [Service]
 Type=simple
 User=root
+WorkingDirectory=/usr/local/bin
 ExecStart=/usr/local/bin/tianshu_core
+
+# 防炸机制：崩溃后3秒自动拉起
 Restart=always
 RestartSec=3
+
+# 开启 info 级别的日志，方便在 journalctl 里看 K 值
+Environment=RUST_LOG=info
+
+# 极其关键：解除默认的物理内存锁定限制，保你的 mlock 不死
+LimitMEMLOCK=infinity
+
 [Install]
 WantedBy=multi-user.target
