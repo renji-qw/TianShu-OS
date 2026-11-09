@@ -116,9 +116,9 @@ rm -rf /var/cache/pacman/pkg/* 2>/dev/null || true
 rm -rf /var/lib/pacman/sync/* 2>/dev/null || true
 rm -rf /root/.cache/* /tmp/* 2>/dev/null || true
 
-echo "==> [TianShu] 配置 Live 环境：开机直进安装器"
+echo "==> [TianShu] 配置 Live 环境：开机直进 archinstall"
 
-# 1. 禁用 SDDM，Live 环境不需要它
+# 1. 禁用 SDDM（Live 不需要，省资源）
 systemctl disable sddm
 
 # 2. 让 tty1 终端自动以 root 登录
@@ -129,10 +129,9 @@ ExecStart=
 ExecStart=-/sbin/agetty --autologin root --noclear %I $TERM
 EOF
 
-# 3. 配置 root 用户登录后，自动启动图形界面并拉起安装器
+# 3. root 登录后，直接在终端启动 archinstall
 cat > /root/.bash_profile <<'EOF'
-# 如果还没进入图形界面，就执行 startx
 if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
-    exec startx /usr/bin/calamares
+    archinstall
 fi
 EOF
