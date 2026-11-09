@@ -159,8 +159,8 @@ fn calc_lambda(level: SimdLevel, lambda: f32, chi: f32, rho: f32, d_sq: f32, tem
     // SAFETY: SimdLevel 由 detect() 通过 CPUID 验证，与 target_feature 一致，不会 SIGILL。
     match level {
         SimdLevel::Avx512 => unsafe { calc_lambda_avx512(lambda, chi, rho, d_sq, temp) },
-        SimdLevel::Avx2 => unsafe { calc_lambda_avx2(lambda, chi, rho, d_sq, temp) },
-        SimdLevel::Avx => unsafe { calc_lambda_avx(lambda, chi, rho, d_sq, temp) }, // 这里去掉末尾的 2
+        SimdLevel::Avx2   => unsafe { calc_lambda_avx2(lambda, chi, rho, d_sq, temp) },
+        SimdLevel::Avx    => unsafe { calc_lambda_avx(lambda, chi, rho, d_sq, temp) },
         SimdLevel::Generic => calc_lambda_generic(lambda, chi, rho, d_sq, temp),
     }
 }
