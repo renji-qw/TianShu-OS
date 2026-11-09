@@ -38,6 +38,7 @@ noto-fonts-cjk
 wqy-zenhei
 
 # === 图形化安装器与生态 ===
+archinstall
 pamac-aur
 yay
 base-devel
