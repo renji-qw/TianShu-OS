@@ -46,7 +46,6 @@ rm -rf iso-profile
 cp -r /usr/share/archiso/configs/releng ./iso-profile
 
 # ================= 终极修复：借 EndeavourOS 的库来装 calamares =================
-echo "==> [CI] 配置多源与 EndeavourOS (为了 calamares)"
 cat > ./iso-profile/pacman.conf <<'EOF'
 [options]
 HoldPkg = pacman glibc
@@ -55,21 +54,22 @@ SigLevel = Required DatabaseOptional
 LocalFileSigLevel = Optional
 
 [core]
-Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch
 Server = https://mirrors.tuna.tsinghua.edu.cn/archlinux/$repo/os/$arch
+Server = https://mirrors.ustc.edu.cn/archlinux/$repo/os/$arch
 
 [extra]
-Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch
 Server = https://mirrors.tuna.tsinghua.edu.cn/archlinux/$repo/os/$arch
+Server = https://mirrors.ustc.edu.cn/archlinux/$repo/os/$arch
 
 [endeavouros]
 SigLevel = PackageRequired
-Server = https://mirrors.tuna.tsinghua.edu.cn/endeavouros/$arch
-Server = https://mirror.funami.tech/endeavouros/repo/$arch
+Server = https://mirrors.tuna.tsinghua.edu.cn/endeavouros/repo/$arch
+Server = https://mirrors.ustc.edu.cn/endeavouros/repo/$arch
 
 [archlinuxcn]
 SigLevel = Optional TrustAll
 Server = https://mirrors.ustc.edu.cn/archlinuxcn/$arch
+Server = https://mirrors.tuna.tsinghua.edu.cn/archlinuxcn/$arch
 EOF
 # 1. archlinuxcn 仓库（pamac-aur / yay 来源）
 printf '%s\n' '' '[archlinuxcn]' 'SigLevel = Optional TrustAll' \
