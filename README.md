@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/banner.svg" alt="TianShu OS" width="100%" />
+<img src="https://capsule-render.vercel.app/api?type=rect&color=0:E2D0E8,50:D8D1E6,100:CEC5DB&text=TianShu%20OS&desc=EMERGENT%20OS&fontColor=2A2438&fontSize=70&descSize=18&descAlignY=68&animation=fadeIn" width="100%" />
 
 <br>
 
@@ -10,10 +10,18 @@
 
 <br>
 
+<!-- 动态状态与协议 -->
 [![Release](https://img.shields.io/github/v/release/renji-qw/TianShu-OS?style=flat-square&color=E2D0E8&labelColor=0A0A0A)](https://github.com/renji-qw/TianShu-OS/releases)
-[![Stars](https://img.shields.io/github/stars/renji-qw/TianShu-OS?style=flat-square&color=E2D0E8&labelColor=0A0A0A)](https://github.com/renji-qw/TianShu-OS/stargazers)
-[![Last Commit](https://img.shields.io/github/last-commit/renji-qw/TianShu-OS?style=flat-square&color=CEC5DB&labelColor=0A0A0A)](https://github.com/renji-qw/TianShu-OS/commits)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--only-E2D0E8?style=flat-square&labelColor=0A0A0A)](./LICENSE)
+[![Stars](https://img.shields.io/github/stars/renji-qw/TianShu-OS?style=flat-square&color=CEC5DB&labelColor=0A0A0A)](https://github.com/renji-qw/TianShu-OS/stargazers)
+
+<br>
+
+<!-- 核心架构展示 -->
+[![Base](https://img.shields.io/badge/Base-Arch%20Linux-0A0A0A?style=flat-square&logo=arch-linux&logoColor=E2D0E8)](#)
+[![Boot](https://img.shields.io/badge/Boot-systemd--boot-0A0A0A?style=flat-square&logo=systemd&logoColor=E2D0E8)](#)
+[![Engine](https://img.shields.io/badge/Engine-Rust%20musl-0A0A0A?style=flat-square&logo=rust&logoColor=E2D0E8)](#)
+[![Desktop](https://img.shields.io/badge/Desktop-KDE%20Plasma%206-0A0A0A?style=flat-square&logo=kde&logoColor=E2D0E8)](#)
 
 <br>
 
@@ -111,6 +119,8 @@ sudo pacman -S archiso
 git clone https://github.com/renji-qw/TianShu-OS.git
 cd TianShu-OS
 sudo mkarchiso -v -w work -o out .
+```
+
 </details>
 
 早期测试阶段，请勿用于生产环境或存有重要数据的机器。
