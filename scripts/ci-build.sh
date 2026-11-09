@@ -45,8 +45,8 @@ echo "==> [CI] 组装 ISO profile"
 rm -rf iso-profile
 cp -r /usr/share/archiso/configs/releng ./iso-profile
 
-# ================= 关键修复：强制替换 ISO 的 pacman 官方源 =================
-echo "==> [CI] 修复 iso-profile 的国内镜像源"
+# ================= 关键修复：官方源保底 =================
+echo "==> [CI] 修复 iso-profile 的镜像源"
 cat > ./iso-profile/pacman.conf <<'EOF'
 [options]
 HoldPkg = pacman glibc
@@ -55,16 +55,14 @@ SigLevel = Required DatabaseOptional
 LocalFileSigLevel = Optional
 
 [core]
+Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch
 Server = https://mirrors.tuna.tsinghua.edu.cn/archlinux/$repo/os/$arch
-Server = https://mirrors.aliyun.com/archlinux/$repo/os/$arch
-Server = https://mirrors.ustc.edu.cn/archlinux/$repo/os/$arch
 
 [extra]
+Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch
 Server = https://mirrors.tuna.tsinghua.edu.cn/archlinux/$repo/os/$arch
-Server = https://mirrors.aliyun.com/archlinux/$repo/os/$arch
-Server = https://mirrors.ustc.edu.cn/archlinux/$repo/os/$arch
-EOF
 
+EOF
 # 1. archlinuxcn 仓库（pamac-aur / yay 来源）
 printf '%s\n' '' '[archlinuxcn]' 'SigLevel = Optional TrustAll' \
   'Server = https://mirrors.ustc.edu.cn/archlinuxcn/$arch' \
