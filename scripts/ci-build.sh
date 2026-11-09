@@ -125,7 +125,6 @@ bash -n ./iso-profile/profiledef.sh && echo "profiledef.sh 语法 OK"
 bash -n ./scripts/customize_airootfs.sh && echo "customize_airootfs.sh 语法 OK"
 
 echo "==> [CI] 构建前清理（pacman 缓存 / 同步库 / 临时文件）"
-rm -rf /var/cache/pacman/pkg/* 2>/dev/null || true
 rm -rf /var/lib/pacman/sync/* 2>/dev/null || true
 rm -rf /root/.cache/* 2>/dev/null || true
 df -h / || true
