@@ -38,7 +38,6 @@ noto-fonts-cjk
 wqy-zenhei
 
 # === 图形化安装器与生态 ===
-calamares
 pamac-aur
 yay
 base-devel
