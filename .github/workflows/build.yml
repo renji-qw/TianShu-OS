@@ -1,34 +1,43 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 紫枢联合组织 / TianShu OS Project
+
 name: TianShu OS
+
 permissions:
   contents: write
 
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag'
+        required: false
+        type: string
+        default: 'v1.0.1-beta'
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 120
+
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
-      # 🚀 1. 开启 Rust 编译缓存
       - name: Setup Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: core -> target
           shared-key: tianshu-musl
 
-      # 🚀 2. 开启 Arch 软件包缓存
       - name: Setup Pacman Cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.cache/pacman
-          key: ${{ runner.os }}-pacman-${{ hashFiles('configs/packages.x86_64') }}
+          key: ${{ runner.os }}-pacman-${{ hashFiles('configs/packages.x86_64', 'packages.x86_64') }}
           restore-keys: |
             ${{ runner.os }}-pacman-
 
-      # 🚀 3. 清理云端宿主机空间（防爆盘）
       - name: Free disk space on host
         run: |
           set -x
@@ -40,13 +49,21 @@ jobs:
           sudo docker system prune -af || true
           df -h /
 
-      # 🚀 4. 进入容器执行编译
+      # 若 ci-build.sh 已包含 cargo build，删掉这一步
+      - name: Build tianshu_core (musl static)
+        working-directory: core
+        run: |
+          set -euxo pipefail
+          rustup target add x86_64-unknown-linux-musl
+          cargo build --release --target x86_64-unknown-linux-musl
+          file target/x86_64-unknown-linux-musl/release/tianshu_core
+          ls -lh target/x86_64-unknown-linux-musl/release/tianshu_core
+
       - name: Build ISO in Arch container
         run: |
           set -euo pipefail
           docker pull archlinux:latest
-          mkdir -p ~/.cache/pacman
-          # 注意这里挂载了你的 pacman 缓存，实现增量
+          mkdir -p ~/.cache/pacman out
           docker run --rm --privileged \
             -v "$PWD":/work \
             -v "$HOME/.cache/pacman":/var/cache/pacman/pkg \
@@ -55,37 +72,74 @@ jobs:
           ls -lh out/
           df -h /
 
-      # 🚀 5. 修复 Docker 产生的权限问题
       - name: Fix Permissions
         run: sudo chown -R $(id -u):$(id -g) out/
 
-      # 🚀 6. 极限压缩
+      - name: Inspect airootfs size
+        if: always()
+        run: |
+          set -euxo pipefail
+          if [ -d airootfs ]; then
+            echo "### airootfs top 40" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            du -xh airootfs 2>/dev/null | sort -h | tail -40 | tee -a "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Extreme Compress ISO
         run: |
+          set -euxo pipefail
           cd out
           for f in *.iso; do
-            echo "使用系统自带 xz 极限压缩 $f..."
-            xz -9e -T0 "$f"
+            BEFORE=$(stat -c%s "$f")
+            echo "压缩前: $f ($(numfmt --to=iec "$BEFORE"))"
+            # BCJ x86 过滤 + lc=4/pb=0 + 256MiB 块：外层 xz 能拧到的最紧
+            xz -T0 --memlimit-compress=80% --x86 \
+               --lzma2=preset=9e,lc=4,lp=0,pb=0 \
+               --block-size=256MiB \
+               -v "$f"
+            AFTER=$(stat -c%s "$f.xz")
+            echo "$f: $(numfmt --to=iec "$BEFORE") -> $(numfmt --to=iec "$AFTER")" \
+              | tee -a "$GITHUB_STEP_SUMMARY"
           done
+          sha256sum *.iso.xz > SHA256SUMS
           ls -lh
 
-      # 🚀 7. 保底上传 Artifact
-      - name: Upload Artifact
+      # 先不切片；超限直接红叉
+      - name: Enforce GitHub Release 2GB limit
+        run: |
+          set -euxo pipefail
+          LIMIT=2147483648
+          FILE=$(find out -maxdepth 1 -name '*.iso.xz' -print -quit)
+          test -n "$FILE"
+          SIZE=$(stat -c%s "$FILE")
+          echo "镜像大小: $SIZE bytes ($(numfmt --to=iec "$SIZE"))" | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$SIZE" -ge "$LIMIT" ]; then
+            echo "::error::ISO.xz 超过 2GB（$SIZE >= $LIMIT）。继续精简或改回 split 切片。"
+            exit 1
+          fi
+
+      - name: Upload diagnostic artifact (on failure)
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: TianShu-OS-ISO
-          path: out/*.iso.xz
-          if-no-files-found: error
-          retention-days: 7
+          name: tianshu-build-diagnostics
+          path: |
+            out/*.iso.xz
+            out/SHA256SUMS
+          if-no-files-found: ignore
+          retention-days: 3
 
-      # 🚀 8. 发布 Release（带强制覆盖）
       - name: Publish to Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.0-lilac
-          name: TianShu OS v1.0 紫丁香测试版
-          files: out/*.iso.xz
-          overwrite: true
+          tag_name: ${{ github.event.inputs.tag }}
+          name: TianShu OS ${{ github.event.inputs.tag }}
+          files: |
+            out/*.iso.xz
+            out/SHA256SUMS
+          overwrite_files: true
+          fail_on_unmatched_files: true
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        
