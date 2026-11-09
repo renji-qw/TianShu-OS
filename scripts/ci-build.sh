@@ -45,7 +45,6 @@ echo "==> [CI] 组装 ISO profile"
 rm -rf iso-profile
 cp -r /usr/share/archiso/configs/releng ./iso-profile
 
-# ================= 终极修复：借 EndeavourOS 的库来装 calamares =================
 cat > ./iso-profile/pacman.conf <<'EOF'
 [options]
 HoldPkg = pacman glibc
@@ -60,11 +59,6 @@ Server = https://mirrors.ustc.edu.cn/archlinux/$repo/os/$arch
 [extra]
 Server = https://mirrors.tuna.tsinghua.edu.cn/archlinux/$repo/os/$arch
 Server = https://mirrors.ustc.edu.cn/archlinux/$repo/os/$arch
-
-[endeavouros]
-SigLevel = PackageRequired
-Server = https://mirror.alpix.eu/endeavouros/repo/$arch
-Server = https://mirror.ams1.nl.leaseweb.net/endeavouros/repo/$arch
 
 [archlinuxcn]
 SigLevel = Optional TrustAll
