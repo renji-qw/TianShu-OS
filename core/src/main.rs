@@ -201,11 +201,16 @@ unsafe fn calc_lambda_avx2(lambda: f32, chi: f32, rho: f32, d_sq: f32, temp: f32
     lambda * (-chi).exp() + rho * (d_sq - 500.0).max(0.0) + rho * (temp - 75.0).max(0.0)
 }
 
+#[target_feature(enable = "avx")]
+#[inline]
+unsafe fn calc_lambda_avx(lambda: f32, chi: f32, rho: f32, d_sq: f32, temp: f32) -> f32 {
+    lambda * (-chi).exp() + rho * (d_sq - 500.0).max(0.0) + rho * (temp - 75.0).max(0.0)
+}
+
 #[inline(always)]
 fn calc_lambda_generic(lambda: f32, chi: f32, rho: f32, d_sq: f32, temp: f32) -> f32 {
     lambda * (-chi).exp() + rho * (d_sq - 500.0).max(0.0) + rho * (temp - 75.0).max(0.0)
 }
-
 // ───────── 辅助 / Helpers ─────────
 
 /// 默认 64 MiB（F510/GX-218GL 只有 2–4GB，512 会挤爆），上限 1024。
