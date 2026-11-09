@@ -35,28 +35,4 @@ jobs:
       - name: Fix Permissions
         run: sudo chown -R $(id -u):$(id -g) out/
 
-      - name: Extreme Compress ISO
-        run: |
-          cd out
-          for f in *.iso; do
-            echo "使用系统自带 xz 极限压缩 $f..."
-            xz -9e -T0 "$f"
-          done
-          ls -lh
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: TianShu-OS-ISO
-          path: out/*.iso.xz
-          if-no-files-found: error
-          retention-days: 7
-
-      - name: Publish to Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v1.0.0-lilac
-          name: TianShu OS v1.0 紫丁香测试版
-          files: out/*.iso.xz
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
