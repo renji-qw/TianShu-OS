@@ -63,8 +63,8 @@ Server = https://mirrors.ustc.edu.cn/archlinux/$repo/os/$arch
 
 [endeavouros]
 SigLevel = PackageRequired
-Server = https://mirrors.tuna.tsinghua.edu.cn/endeavouros/repo/$arch
-Server = https://mirrors.ustc.edu.cn/endeavouros/repo/$arch
+Server = https://mirror.alpix.eu/endeavouros/repo/$arch
+Server = https://mirror.ams1.nl.leaseweb.net/endeavouros/repo/$arch
 
 [archlinuxcn]
 SigLevel = Optional TrustAll
