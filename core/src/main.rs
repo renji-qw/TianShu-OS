@@ -157,15 +157,13 @@ impl SimdLevel {
 #[inline]
 fn calc_lambda(level: SimdLevel, lambda: f32, chi: f32, rho: f32, d_sq: f32, temp: f32) -> f32 {
     // SAFETY: SimdLevel 由 detect() 通过 CPUID 验证，与 target_feature 一致，不会 SIGILL。
-    // SAFETY: SimdLevel is verified by detect() via CPUID, matching target_feature;
-    //         the call cannot cause SIGILL.
     match level {
         SimdLevel::Avx512 => unsafe { calc_lambda_avx512(lambda, chi, rho, d_sq, temp) },
-        SimdLevel::Avx => unsafe { calc_lambda_avx(lambda, chi, rho, d_sq, temp) },
+        SimdLevel::Avx2 => unsafe { calc_lambda_avx2(lambda, chi, rho, d_sq, temp) },
+        SimdLevel::Avx => unsafe { calc_lambda_avx(lambda, chi, rho, d_sq, temp) }, // 这里去掉末尾的 2
         SimdLevel::Generic => calc_lambda_generic(lambda, chi, rho, d_sq, temp),
     }
 }
-
 // ───────── 数学核心（逐字未动；改一个必须同步其余三个） ─────────
 // ───────── Math core (verbatim; any change MUST be mirrored to all four) ─────────
 
