@@ -3,41 +3,67 @@ base
 linux
 linux-firmware
 systemd
-efibootmgr
 sudo
 networkmanager
+wpa_supplicant
 mesa
 polkit
-xdg-user-dirs
 
-# === KDE 紫罗兰桌面（极简版） ===
+# === 文件系统与分区工具 (必带，否则 archinstall 无法格式化) ===
+e2fsprogs
+btrfs-progs
+dosfstools
+ntfs-3g
+gptfdisk
+
+# === KDE 紫罗兰桌面（极简 + 基础三件套） ===
 plasma-desktop
 plasma-workspace
 plasma-nm
 plasma-pa
+systemsettings
+xdg-desktop-portal-kde
 kwin
 breeze
 breeze-icons
 sddm
 dolphin
 konsole
+# B2 基础三件套
+ark
+spectacle
+kate
 
 # === 声音 ===
 pipewire
 pipewire-pulse
 pipewire-alsa
 wireplumber
+sof-firmware
 
-# === 中文字体与输入法 ===
+# === 中文字体与输入法 (完整中文化) ===
 fcitx5
 fcitx5-chinese-addons
 noto-fonts-cjk
+noto-fonts
+noto-fonts-emoji
 
-# 图形化安装器
+# === 安装器与应用商店 (双管齐下) ===
 archinstall
 pamac-aur
+archlinuxcn-keyring
+plasma-discover
+packagekit-qt6
+flatpak
 
-# === 老机器优化 ===
+# === 老机器优化 (进阶续命) ===
 zram-generator
 tlp
 reflector
+irqbalance
+thermald
+
+# === Live 环境极客小工具 ===
+nano
+curl
+bc
