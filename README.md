@@ -25,7 +25,7 @@
 
 <br>
 
-[**下载体验**](https://github.com/renji-qw/TianShu-OS/releases) · [**问题反馈**](https://github.com/renji-qw/TianShu-OS/issues) · [**参与贡献**](./CONTRIBUTING.md) · **QQ 群：xxxxxxxxx**
+[**下载体验**](https://github.com/renji-qw/TianShu-OS/releases) · [**问题反馈**](https://github.com/renji-qw/TianShu-OS/issues) · [**参与贡献**](./CONTRIBUTING.md) · **QQ 群：654776659**
 
 </div>
 
