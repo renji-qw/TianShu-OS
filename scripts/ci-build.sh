@@ -88,15 +88,13 @@ mkdir -p ./iso-profile/airootfs/root
 cp ./scripts/customize_airootfs.sh ./iso-profile/airootfs/root/customize_airootfs.sh
 chmod +x ./iso-profile/airootfs/root/customize_airootfs.sh
 
-# 5. 紫罗兰 KDE 配置 (修复了之前覆盖 kdeglobals 的 bug)
-mkdir -p ./iso-profile/airootfs/etc/tianshu/skel/.config
-mkdir -p ./iso-profile/airootfs/etc/tianshu/skel/.local/share/color-schemes
-cp ./configs/kde/TianShuPurple.colors ./iso-profile/airootfs/etc/tianshu/skel/.local/share/color-schemes/
-cp ./configs/kde/TianShuPurple.colors ./iso-profile/airootfs/etc/tianshu/skel/.config/
-cp ./configs/kde/kwinrc     ./iso-profile/airootfs/etc/tianshu/skel/.config/kwinrc
-cp ./configs/kde/kdeglobals ./iso-profile/airootfs/etc/tianshu/skel/.config/kdeglobals
-mkdir -p ./iso-profile/airootfs/etc/tianshu/skel/.config/latte
-cp ./configs/kde/latte/TianShuViolet.layout ./iso-profile/iso-profile/airootfs/etc/tianshu/sddm.conf
+# 5. 紫罗兰 KDE 配置 (改用 install -Dm，自动创建所有父目录，不会再报错)
+install -Dm644 ./configs/kde/TianShuPurple.colors ./iso-profile/airootfs/etc/tianshu/skel/.local/share/color-schemes/TianShuPurple.colors
+install -Dm644 ./configs/kde/TianShuPurple.colors ./iso-profile/airootfs/etc/tianshu/skel/.config/TianShuPurple.colors
+install -Dm644 ./configs/kde/kwinrc     ./iso-profile/airootfs/etc/tianshu/skel/.config/kwinrc
+install -Dm644 ./configs/kde/kdeglobals ./iso-profile/airootfs/etc/tianshu/skel/.config/kdeglobals
+install -Dm644 ./configs/kde/latte/TianShuViolet.layout ./iso-profile/airootfs/etc/tianshu/skel/.config/latte/TianShuViolet.layout
+install -Dm644 ./configs/kde/sddm.conf ./iso-profile/airootfs/etc/tianshu/sddm.conf
 
 # 6. SDDM 主题（无时钟）
 mkdir -p ./iso-profile/airootfs/usr/share/sddm/themes/tianshu
