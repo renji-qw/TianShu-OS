@@ -1,136 +1,40 @@
 #!/usr/bin/env bash
-# TianShu OS — CI 构建脚本（在 archlinux:latest 容器内以 root 执行）
+# TianShu OS — CI 构建脚本 (拉取 CachyOS 底座)
 set -euo pipefail
+cd "${WORKSPACE:-/work}"
 
-WORKSPACE="${WORKSPACE:-/work}"
-cd "$WORKSPACE"
+# 1. 配置镜像源并安装依赖
+printf 'Server = https://mirrors.ustc.edu.cn/archlinux/$repo/os/$arch\n' > /etc/pacman.d/mirrorlist
+grep -q "\[archlinuxcn\]" /etc/pacman.conf || printf '\n[archlinuxcn]\nSigLevel = Optional TrustAll\nServer = https://mirrors.ustc.edu.cn/archlinuxcn/$arch\n' >> /etc/pacman.conf
+pacman-key --init && pacman-key --populate archlinux && pacman-key --lsign-key "farseerfc@archlinux.org" 2>/dev/null || true
+pacman -Syu --noconfirm --disable-download-timeout
+pacman -S --noconfirm --needed --disable-download-timeout archiso rustup git base-devel archlinuxcn-keyring
 
-echo "==> [CI] 磁盘初始状态"
-df -h / /tmp || true
-
-echo "==> [CI] 配置镜像源（多源 + 重试）"
-printf '%s\n' \
-  'Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch' \
-  'Server = https://mirrors.ustc.edu.cn/archlinux/$repo/os/$arch' \
-  > /etc/pacman.d/mirrorlist
-
-# 确保宿主环境的 pacman.conf 只有一份 archlinuxcn
-if ! grep -q "\[archlinuxcn\]" /etc/pacman.conf; then
-printf '\n[archlinuxcn]\nSigLevel = Optional TrustAll\nServer = https://mirrors.ustc.edu.cn/archlinuxcn/$arch\n' >> /etc/pacman.conf
-fi
-
-pacman-key --init
-pacman-key --populate archlinux
-# archlinuxcn 密钥导入
-pacman-key --lsign-key "farseerfc@archlinux.org" 2>/dev/null || true
-
-for i in 1 2 3; do
-  pacman -Syu --noconfirm --disable-download-timeout && break
-  echo "pacman -Syu 第 $i 次失败，重试..."; sleep 10
-done
-for i in 1 2 3; do
-  pacman -S --noconfirm --needed --disable-download-timeout \
-    archiso rustup git base-devel archlinuxcn-keyring && break
-  echo "pacman -S 第 $i 次失败，重试..."; sleep 10
-done
-
-echo "==> [CI] Rust 工具链"
+# 2. 编译 Rust 微积分核心
 export RUSTUP_DIST_SERVER="https://rsproxy.cn"
-rustup default stable
-rustup target add x86_64-unknown-linux-musl
-rustc -vV
+rustup default stable && rustup target add x86_64-unknown-linux-musl
+(cd core && RUSTFLAGS="-C target-cpu=x86-64" cargo build --release --target x86_64-unknown-linux-musl)
 
-echo "==> [CI] 编译 tianshu_core"
-cd "$WORKSPACE/core"
-RUSTFLAGS="-C target-cpu=x86-64" cargo build --release --target x86_64-unknown-linux-musl
-cd "$WORKSPACE"
-ls -lh core/target/x86_64-unknown-linux-musl/release/tianshu_core
+# 3. 获取 CachyOS 底座模板
+rm -rf iso-profile cachyos-archiso
+git clone --depth 1 https://github.com/CachyOS/cachyos-archiso.git
+cp -r cachyos-archiso/archiso iso-profile
 
-echo "==> [CI] 组装 ISO profile"
-rm -rf iso-profile
-cp -r /usr/share/archiso/configs/releng ./iso-profile
+# 4. 注入天枢OS 自定义组件
+install -Dm755 core/target/x86_64-unknown-linux-musl/release/tianshu_core iso-profile/airootfs/usr/bin/tianshu_core
+install -Dm755 scripts/customize_airootfs.sh iso-profile/airootfs/root/customize_airootfs.sh
+install -Dm644 configs/packages.x86_64 iso-profile/packages.x86_64
+install -Dm644 configs/tianshu.service iso-profile/airootfs/etc/systemd/system/tianshu.service
+# 复制整个 KDE 配置目录 (简写)
+cp -r configs/kde iso-profile/airootfs/etc/tianshu/
+mkdir -p iso-profile/airootfs/etc/sddm.conf.d
+cp configs/kde/sddm.conf iso-profile/airootfs/etc/sddm.conf.d/10-tianshu.conf
 
-# 统一配置 profile 里的 pacman.conf
-cat > ./iso-profile/pacman.conf <<'EOF'
-[options]
-HoldPkg = pacman glibc
-Architecture = auto
-SigLevel = Required DatabaseOptional
-LocalFileSigLevel = Optional
+# 5. 强制开启 GRUB 双系统探测，并开启 xz 极限压缩
+sed -i "s/^bootmodes=.*/bootmodes=('uefi-x64.grub.esp' 'uefi-x64.grub.eltorito')/" iso-profile/profiledef.sh
+echo "GRUB_DISABLE_OS_PROBER=false" >> iso-profile/airootfs/etc/default/grub
+sed -i "s/airootfs_image_tool_options=.*/airootfs_image_tool_options=('-comp' 'xz' '-Xbcj' 'x86' '-b' '1M' '-Xdict-size' '100%')/" iso-profile/profiledef.sh
 
-[core]
-Server = https://mirrors.tuna.tsinghua.edu.cn/archlinux/$repo/os/$arch
-Server = https://mirrors.ustc.edu.cn/archlinux/$repo/os/$arch
-
-[extra]
-Server = https://mirrors.tuna.tsinghua.edu.cn/archlinux/$repo/os/$arch
-Server = https://mirrors.ustc.edu.cn/archlinux/$repo/os/$arch
-
-[archlinuxcn]
-SigLevel = Optional TrustAll
-Server = https://mirrors.ustc.edu.cn/archlinuxcn/$arch
-EOF
-
-# 1. 内核引擎二进制 (注意：放进了 /usr/bin/，配合 tianshu.service 的 ExecStart)
-mkdir -p ./iso-profile/airootfs/usr/bin
-cp ./core/target/x86_64-unknown-linux-musl/release/tianshu_core ./iso-profile/airootfs/usr/bin/tianshu_core
-chmod 755 ./iso-profile/airootfs/usr/bin/tianshu_core
-
-# 2. 软件清单
-cp ./configs/packages.x86_64 ./iso-profile/packages.x86_64
-
-# 3. systemd 单元
-mkdir -p ./iso-profile/airootfs/etc/systemd/system
-cp ./configs/tianshu.service ./iso-profile/airootfs/etc/systemd/system/tianshu.service
-
-# 4. chroot 定制脚本
-mkdir -p ./iso-profile/airootfs/root
-cp ./scripts/customize_airootfs.sh ./iso-profile/airootfs/root/customize_airootfs.sh
-chmod +x ./iso-profile/airootfs/root/customize_airootfs.sh
-
-# 5. 紫罗兰 KDE 配置 (改用 install -Dm，自动创建所有父目录，不会再报错)
-install -Dm644 ./configs/kde/TianShuPurple.colors ./iso-profile/airootfs/etc/tianshu/skel/.local/share/color-schemes/TianShuPurple.colors
-install -Dm644 ./configs/kde/TianShuPurple.colors ./iso-profile/airootfs/etc/tianshu/skel/.config/TianShuPurple.colors
-install -Dm644 ./configs/kde/kwinrc     ./iso-profile/airootfs/etc/tianshu/skel/.config/kwinrc
-install -Dm644 ./configs/kde/kdeglobals ./iso-profile/airootfs/etc/tianshu/skel/.config/kdeglobals
-install -Dm644 ./configs/kde/latte/TianShuViolet.layout ./iso-profile/airootfs/etc/tianshu/skel/.config/latte/TianShuViolet.layout
-install -Dm644 ./configs/kde/sddm.conf ./iso-profile/airootfs/etc/tianshu/sddm.conf
-
-# 6. SDDM 主题（无时钟）
-mkdir -p ./iso-profile/airootfs/usr/share/sddm/themes/tianshu
-cp ./configs/kde/sddm/theme.conf ./iso-profile/airootfs/usr/share/sddm/themes/tianshu/theme.conf
-cp ./configs/kde/sddm/Main.qml   ./iso-profile/airootfs/usr/share/sddm/themes/tianshu/Main.qml
-
-# 7. 引导：强制 systemd-boot，剔除 init= 与 elevator=bfq
-sed -i '/^bootmodes=/,/)/d' ./iso-profile/profiledef.sh
-printf "%s\n" "bootmodes=('uefi-x64.systemd-boot.esp' 'uefi-x64.systemd-boot.eltorito')" >> ./iso-profile/profiledef.sh
-find ./iso-profile/efiboot -type f -name "*.conf" -exec sed -i -E 's/ init=[^ ]*//g; s/ elevator=[^ ]*//g; s/options .*/options quiet splash loglevel=3/' {} +
-if [ -d ./iso-profile/syslinux ]; then
-  # 修复了之前的语法错误（少了一个空格）
-  find ./iso-profile/syslinux -type f -name "*.cfg" -exec sed -i -E 's/ init=[^ ]*//g; s/ elevator=[^ ]*//g' {} + || true
-fi
-
-# 8. squashfs：恢复 xz 极限压缩，确保体积逼近 2GB 红线也能过
-sed -i "s/airootfs_image_tool_options=.*/airootfs_image_tool_options=('-comp' 'xz' '-Xbcj' 'x86' '-b' '1M' '-Xdict-size' '100%')/" ./iso-profile/profiledef.sh
-
-echo "----- 校验 -----"
-grep -n "bootmodes" ./iso-profile/profiledef.sh
-grep -n "airootfs_image_tool_options" ./iso-profile/profiledef.sh
-bash -n ./iso-profile/profiledef.sh && echo "profiledef.sh 语法 OK"
-bash -n ./scripts/customize_airootfs.sh && echo "customize_airootfs.sh 语法 OK"
-
-echo "==> [CI] 构建前清理"
-rm -rf /var/lib/pacman/sync/* 2>/dev/null || true
-rm -rf /root/.cache/* 2>/dev/null || true
-df -h / || true
-
-echo "==> [CI] mkarchiso 开始"
-rm -rf /tmp/work "$WORKSPACE/out"
-mkdir -p /tmp/work "$WORKSPACE/out"
-mkarchiso -v -w /tmp/work -o "$WORKSPACE/out" ./iso-profile
-
-echo "==> [CI] 清理中间产物"
-rm -rf /tmp/work
-ls -lh "$WORKSPACE/out"
-df -h / || true
-echo "==> [CI] 构建完成"
+# 6. 构建 ISO
+rm -rf /tmp/work out && mkdir -p /tmp/work out
+mkarchiso -v -w /tmp/work -o out ./iso-profile
