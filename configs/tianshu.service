@@ -1,18 +1,10 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # Copyright (C) 2026 紫枢联合组织 / TianShu OS Project
 # tianshu_core v1.0.1-beta systemd unit
-# 调度核心服务单元 / Scheduling core service unit
 
 [Unit]
 Description=TianShu OS Core Engine
-# 不依赖网络：调度器只读 /proc、/sys，网络慢时不应拖慢启动。
-# No network dependency: the scheduler only reads /proc and /sys; a slow
-# network must not delay startup.
 After=local-fs.target
-
-# 防刷屏：RestartSec 只控间隔不控次数，崩溃循环会刷爆 journal 和 ZRAM。
-# RestartRate limit: RestartSec only spaces retries; without a burst limit,
-# a crash loop floods journald and ZRAM.
 StartLimitIntervalSec=60
 StartLimitBurst=5
 
@@ -20,45 +12,36 @@ StartLimitBurst=5
 Type=simple
 User=root
 
-# 系统服务二进制放 /usr/bin，/usr/local/bin 是管理员本地覆盖用的。
-# System service binaries belong in /usr/bin; /usr/local/bin is for local overrides.
+# 调度核心的绝对路径
 ExecStart=/usr/bin/tianshu_core
 
-# 崩溃 3 秒后自动拉起，配合上面的 StartLimit 防止无限循环。
-# Auto-restart 3s after crash, bounded by the StartLimit above.
+# 崩溃 3 秒后自动拉起，防无限刷屏
 Restart=always
 RestartSec=3
 
-# ctrlc crate 默认只捕获 SIGINT；systemd 默认发 SIGTERM 会绕过 Drop 和优雅退出。
-# ctrlc only handles SIGINT by default; systemd's default SIGTERM would bypass
-# Drop and the graceful-exit path.
+# 捕获 SIGINT 以执行优雅退出
 KillSignal=SIGINT
 
-# info 级别日志，方便 journalctl -u tianshu-core 观察 K 值。
-# info-level logs so `journalctl -u tianshu-core` shows the K value.
+# 日志环境
 Environment=RUST_LOG=info
-
-# 显式声明预留大小，不依赖代码默认值，方便测试时临时覆盖。
-# Declare reservation size explicitly instead of relying on the code default;
-# easier to override during testing.
 Environment=TIANSHU_RESERVE_MB=64
 
-# 解除默认 RLIMIT_MEMLOCK，否则 mlock 会被内核拒绝并降级为普通映射。
-# Lift the default RLIMIT_MEMLOCK; otherwise mlock is rejected and silently
-# degrades to a normal mapping.
+# 赋予极高的 CPU 优先级，防止系统满载时调度器被饿死
+Nice=-10
+
+# 解除物理内存锁定限制
 LimitMEMLOCK=infinity
 
-# 段错误时禁止写 core，Live 的 tmpfs 会被一个 core 撑爆。
-# Disable core dumps; a single core file can exhaust the Live tmpfs.
+# 防爆核心转储文件
 LimitCORE=0
 
-# 内存上限，防止 TIANSHU_RESERVE_MB 被误调大后锁死过多物理页。
-# Cap memory so a misconfigured TIANSHU_RESERVE_MB cannot pin excessive pages.
-MemoryMax=1G
+# 限制最大内存占用（防泄漏，已放宽至 2G 以适应高预留场景）
+MemoryMax=2G
 
-# 温和加固：只读 /usr、/boot、/etc，不影响 mlock/mmap 和读 /proc、/sys。
-# Mild hardening: read-only /usr, /boot, /etc; mlock/mmap and /proc, /sys
-# reads are unaffected.
+# 进程被清理时只杀主进程
+KillMode=process
+
+# 权限最小化加固
 NoNewPrivileges=true
 ProtectSystem=full
 ProtectHome=true
