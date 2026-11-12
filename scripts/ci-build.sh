@@ -15,9 +15,9 @@ export RUSTUP_DIST_SERVER="https://rsproxy.cn"
 rustup default stable && rustup target add x86_64-unknown-linux-musl
 (cd core && RUSTFLAGS="-C target-cpu=x86-64" cargo build --release --target x86_64-unknown-linux-musl)
 
-# 3. 获取 CachyOS 底座模板
+# 3. 拉取 CachyOS 底座
 rm -rf iso-profile cachyos-archiso
-git clone --depth 1 https://github.com/CachyOS/cachyos-archiso.git
+GIT_TERMINAL_PROMPT=0 git clone --depth 1 https://github.com/CachyOS/cachyos-archiso.git
 cp -r cachyos-archiso/archiso iso-profile
 
 # 4. 注入天枢OS 自定义组件
