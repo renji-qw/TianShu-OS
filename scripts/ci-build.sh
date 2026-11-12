@@ -13,24 +13,22 @@ export RUSTUP_DIST_SERVER="https://rsproxy.cn"
 rustup default stable && rustup target add x86_64-unknown-linux-musl
 (cd core && RUSTFLAGS="-C target-cpu=x86-64" cargo build --release --target x86_64-unknown-linux-musl)
 
-# 2.5 配置 CachyOS 仓库并安装 Keyring
-echo "==> 配置 CachyOS 仓库并安装密钥环..."
+# 2.5 自动配置 CachyOS 密钥环并自动确认
+echo "==> 自动配置 CachyOS 密钥环..."
+pacman-key --init
+pacman-key --populate archlinux
 
-# 1. 下载并安装 CachyOS 的 mirrorlist 和 keyring
-#    直接通过 URL 安装，绕开 pacman 的依赖检查
-pacman -U --noconfirm \
-    'https://mirror.cachyos.org/repo/x86_64/cachyos/cachyos-mirrorlist-20240331-1-any.pkg.tar.zst' \
-    'https://mirror.cachyos.org/repo/x86_64/cachyos/cachyos-keyring-20240331-1-any.pkg.tar.zst'
+# 从服务器拉取 CachyOS 签名密钥
+pacman-key --recv-keys F3B607488DB35A47 --keyserver keyserver.ubuntu.com
 
-# 2. 在 pacman.conf 中启用 CachyOS 仓库
-#    注意：这段配置必须加在 [core] 和 [extra] 之前
-sudo tee -a /etc/pacman.conf > /dev/null <<EOF
+# 利用 yes 命令自动输入 Y 并信任该密钥
+yes | pacman-key --lsign-key F3B607488DB35A47
 
-[cachyos]
-SigLevel = PackageRequired
-Include = /etc/pacman.d/cachyos-mirrorlist
-EOF
+# 安装 CachyOS 的 keyring 包 (如果弹窗提示导入，yes 会自动处理)
+yes | pacman -Sy archlinux-keyring cachyos-keyring
 
+# 强制刷新数据库
+pacman -Syy --noconfirm
 # 3. 初始化并填充密钥
 pacman-key --init
 pacman-key --populate archlinux cachyos
