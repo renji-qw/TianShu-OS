@@ -15,9 +15,9 @@ export RUSTUP_DIST_SERVER="https://rsproxy.cn"
 rustup default stable && rustup target add x86_64-unknown-linux-musl
 (cd core && RUSTFLAGS="-C target-cpu=x86-64" cargo build --release --target x86_64-unknown-linux-musl)
 
-# 3. 拉取 CachyOS 底座 (使用 wget 绕过 Git 认证)
+# 3. 拉取 CachyOS 底座
 rm -rf iso-profile cachyos-archiso
-wget -qO cachyos.tar.gz https://github.com/CachyOS/cachyos-archiso/archive/refs/heads/main.tar.gz
+curl -L -o cachyos.tar.gz https://github.com/CachyOS/cachyos-archiso/archive/refs/heads/main.tar.gz
 tar -xzf cachyos.tar.gz
 mv cachyos-archiso-main cachyos-archiso
 cp -r cachyos-archiso/archiso iso-profile
