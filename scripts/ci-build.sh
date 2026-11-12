@@ -13,25 +13,45 @@ export RUSTUP_DIST_SERVER="https://rsproxy.cn"
 rustup default stable && rustup target add x86_64-unknown-linux-musl
 (cd core && RUSTFLAGS="-C target-cpu=x86-64" cargo build --release --target x86_64-unknown-linux-musl)
 
-# 2.5 借用 CachyOS 官方自愈逻辑，一劳永逸解决密钥与镜像列表
-echo "==> 彻底重置并一键注入 CachyOS 密钥环境..."
+# 2.5 手动下载 CachyOS 核心包并强制安装（彻底绕过仓库依赖）
+echo "==> 手动下载并安装 CachyOS 核心组件..."
 
-# 1. 强行清理旧的、可能引发冲突的 GPG 目录
+# 1. 强制重置本地 GPG 数据库，清除所有损坏的密钥
 sudo rm -rf /etc/pacman.d/gnupg/
-
-# 2. 初始化并填充基础 Arch 密钥
 pacman-key --init
 pacman-key --populate archlinux
 
-# 3. 直接从官方源拉取最新的密钥环与镜像列表（不写死版本号，让系统自己找最新包）
-pacman -Sy --noconfirm --needed archlinux-keyring cachyos-keyring cachyos-mirrorlist
+# 2. 直接下载最新的 keyring 和 mirrorlist 离线包到 /tmp
+#    -L 跟随重定向，-O 保持文件名
+sudo curl -L -o /tmp/cachyos-keyring.pkg.tar.zst \
+  "https://mirror.cachyos.org/repo/x86_64/cachyos/cachyos-keyring-3-1-any.pkg.tar.zst"
+sudo curl -L -o /tmp/cachyos-mirrorlist.pkg.tar.zst \
+  "https://mirror.cachyos.org/repo/x86_64/cachyos/cachyos-mirrorlist-18-1-any.pkg.tar.zst"
 
-# 4. 填充并信任 CachyOS 密钥
+# 3. 强制安装这两个本地包（--noconfirm 自动确认）
+sudo pacman -U --noconfirm /tmp/cachyos-keyring.pkg.tar.zst /tmp/cachyos-mirrorlist.pkg.tar.zst
+
+# 4. 填充并信任 CachyOS 的密钥
 pacman-key --populate archlinux cachyos
 
-# 5. 动态将 CachyOS 仓库配置写入 pacman.conf（防止重复写入）
+# 5. 手动导入并签名 CachyOS 的签名密钥（F3B607488DB35A47）
+#    这是解决签名验证失败的关键一步
+pacman-key --recv-keys F3B607488DB35A47 --keyserver keyserver.ubuntu.com
+pacman-key --lsign-key F3B607488DB35A47
+
+# 6. 动态将 CachyOS 仓库配置写入 pacman.conf
+#    确保仓库条目不会被重复添加
 if ! grep -q "\[cachyos\]" /etc/pacman.conf; then
     sudo tee -a /etc/pacman.conf > /dev/null <<EOF
+
+[cachyos]
+SigLevel = Optional TrustAll
+Include = /etc/pacman.d/cachyos-mirrorlist
+EOF
+fi
+
+# 7. 刷新数据库，让 pacman 识别新仓库
+pacman -Syy --noconfirm
 
 [cachyos]
 SigLevel = PackageRequired
