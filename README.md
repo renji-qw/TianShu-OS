@@ -1,145 +1,137 @@
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=rect&color=0:E2D0E8,50:D8D1E6,100:CEC5DB&text=TianShu%20OS&desc=EMERGENT%20OS&fontColor=2A2438&fontSize=70&descSize=18&descAlignY=68&animation=fadeIn" width="100%" />
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:E2D0E8,50:D8D1E6,100:CEC5DB&text=TianShu%20OS&desc=%E5%A4%A9%E6%9E%A2%20%C2%B7%20%E6%B6%8C%E7%8E%B0%E5%BC%8F%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F&fontColor=2A2438&fontSize=60&descSize=16&descAlignY=70&animation=twinkling" width="100%" />
 
-<br>
+*“玄之又玄，众妙之门。”*
 
-**在每一块垂死的硅片上，重新绽放的紫丁香。**
-
-*An Arch-based distro with a Rust scheduler and KDE Plasma 6.*
-
-<br>
-
-<!-- 动态状态与协议 -->
-[![Release](https://img.shields.io/github/v/release/renji-qw/TianShu-OS?style=flat-square&color=E2D0E8&labelColor=0A0A0A)](https://github.com/renji-qw/TianShu-OS/releases)
-[![License](https://img.shields.io/badge/license-AGPL--3.0--only-E2D0E8?style=flat-square&labelColor=0A0A0A)](./LICENSE)
-[![Stars](https://img.shields.io/github/stars/renji-qw/TianShu-OS?style=flat-square&color=CEC5DB&labelColor=0A0A0A)](https://github.com/renji-qw/TianShu-OS/stargazers)
-
-<br>
-
-<!-- 核心架构展示 -->
-[![Base](https://img.shields.io/badge/Base-Arch%20Linux-0A0A0A?style=flat-square&logo=arch-linux&logoColor=E2D0E8)](#)
-[![Boot](https://img.shields.io/badge/Boot-systemd--boot-0A0A0A?style=flat-square&logo=systemd&logoColor=E2D0E8)](#)
-[![Engine](https://img.shields.io/badge/Engine-Rust%20musl-0A0A0A?style=flat-square&logo=rust&logoColor=E2D0E8)](#)
-[![Desktop](https://img.shields.io/badge/Desktop-KDE%20Plasma%206-0A0A0A?style=flat-square&logo=kde&logoColor=E2D0E8)](#)
-
-<br>
-
-[**下载体验**](https://github.com/renji-qw/TianShu-OS/releases) · [**问题反馈**](https://github.com/renji-qw/TianShu-OS/issues) · [**参与贡献**](./CONTRIBUTING.md) · **QQ 群：654776659**
+[![Star](https://img.shields.io/badge/Star-结个善缘-E2D0E8?style=flat-square&logo=github&logoColor=0A0A0A&labelColor=E2D0E8)](#)
+[![License](https://img.shields.io/badge/License-AGPL--3.0-0A0A0A?style=flat-square)](#)
 
 </div>
 
 ---
 
-## 这是什么
+### 序 · 缘起：紫气东来
 
-天枢OS 是一个基于 Arch Linux 的个人发行版：**systemd-boot (UEFI-only) + 纯 Rust 调度核心 + KDE Plasma 6 紫罗兰主题**。
+*“上善若水。水善利万物而不争。”*
 
-它想回答一个问题：**如果资源调度不追求绝对公平，而是像生物体一样按痛觉退让，会发生什么？**
+现代操作系统往往用强制公平的算法切割算力，冰冷且焦躁。我是一名研究毒理与环境科学的道士，也是一名摄影生。在无数次被工业极客系统的黑框折磨后，我决定自己造一个。
 
-> 当前实现 λ（痛觉退让）主方程。其余四组耦合方程在路线图中。
+以西北清晨 6:58 自然光下的紫丁香为引，便有了这方天地。
 
----
-
-## 核心特性
-
-<table>
-<tr>
-<td width="50%" valign="top">
-
-**Rust 调度核心**
-
-`tianshu_core` 纯 Rust 编写，musl 静态链接，运行时探测 AVX512 / AVX2 / AVX / 通用实现。
-
-</td>
-<td width="50%" valign="top">
-
-**工业级防炸**
-
-`catch_unwind` 熔断、`NaN/Inf` 拦截、`mlock` 内存锁定、`MADV_DONTNEED` 高压回收。
-
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
-
-**极简引导**
-
-`systemd-boot` UEFI-only，无 `init=` 参数，无遗留兼容层。
-
-</td>
-<td width="50%" valign="top">
-
-**紫罗兰美学**
-
-三阶紫罗兰配色 + KWin 全局毛玻璃 + 无时钟 QML SDDM 登录。
-
-</td>
-</tr>
-</table>
-
----
-
-## 技术栈
-
-| 维度 | 决策 |
-| :--- | :--- |
-| 底座 | Arch Linux (archiso releng) |
-| 引导 | systemd-boot (UEFI-only) |
-| 调度核心 | Rust · musl 静态链接 · x86_64 |
-| 桌面 | KDE Plasma 6 + SDDM |
-| 电源 / 内存 | ZRAM + TLP |
-
----
-
-## 快速开始
-
-<details>
-<summary><b>用 Ventoy 体验 Live（推荐）</b></summary>
-
-1. 下载 Release 里的 `.iso.xz`，解压得到 `.iso`；
-2. 用 [Ventoy](https://www.ventoy.net/) 制作启动盘，把 `.iso` 拷进 U 盘；
-3. UEFI 启动，选择 TianShu OS。
-
-</details>
-
-<details>
-<summary><b>用虚拟机体验</b></summary>
-
-VirtualBox / VMware 新建 **UEFI** 虚拟机，挂载 ISO，至少 4GB 内存。
-
-</details>
-
-<details>
-<summary><b>从源码构建</b></summary>
-
-```bash
-# 需要 Arch Linux 环境
-sudo pacman -S archiso
-git clone https://github.com/renji-qw/TianShu-OS.git
-cd TianShu-OS
-sudo mkarchiso -v -w work -o out .
-```
-
-</details>
-
-早期测试阶段，请勿用于生产环境或存有重要数据的机器。
-
----
-
-授权
-
-AGPL-3.0-only。个人、教育、开源项目自由使用。
-
-· 商业闭源使用需单独授权：COMMERCIAL.md
-· AI 训练抓取请求：AI-TRAINING-POLICY.md
-
----
+<br>
 
 <div align="center">
 
-<sub>© 2026 紫枢联合组织 · TianShu OS Project</sub>
+### 视觉 · 三阶紫罗兰
 
-<sub><i>“哪来那么多规矩，讲不通物理，就用物理来讲。”</i></sub>
+摒弃一切高饱和度的刺眼色彩，系统全局仅保留三种极简阶调，配合 KDE Plasma 6 的全局毛玻璃与 12px 柔和圆角。
+
+| 色彩阶级 | 视觉呈现 | 应用场景 | HEX 色值 |
+| :---: | :--- | :--- | :--- |
+| **第一阶** | <div align="center"><div style="width:80px;height:30px;background-color:#E2D0E8;border-radius:4px;"></div></div> | 薄暮丁香紫 (主背景) | `#E2D0E8` |
+| **第二阶** | <div align="center"><div style="width:80px;height:30px;background-color:#D8D1E6;border-radius:4px;"></div></div> | 暮色灰紫 (侧边栏) | `#D8D1E6` |
+| **第三阶** | <div align="center"><div style="width:80px;height:30px;background-color:#CEC5DB;border-radius:4px;"></div></div> | 薰衣草灰 (选中态) | `#CEC5DB` |
+
+</div>
+
+---
+
+### 基 · 筑基：厚德载物
+
+*“飘风不终朝，骤雨不终日。”*
+
+原生 Arch 的滚动更新极易让系统崩坏（滚挂）。故重构底盘为 **CachyOS**。
+底层强制 Btrfs 筋骨，每逢更新，必先静默打一重“快照”。若真遇外邪入侵致系统崩溃，只需在 GRUB 中一键逆转，瞬间恢复如初。
+
+放弃了对 UEFI 极度挑剔的 `systemd-boot`，回归宽厚包容的 `GRUB`。兼容 Windows 双系统，是为顺应世间万物的法门。
+
+---
+
+### 魂 · 阵图：中宫黑板与五行演算
+
+*“致虚极，守静笃。万物并作，吾以观复。”*
+
+天枢 OS 的灵魂（`tianshu_core`），是一套由纯 Rust 手工锻造的动力学引擎。
+它摒弃了传统的单线程阻塞，采用了硬件级的**“四象阵”**：中宫置一“黑板”，青龙（采集）、朱雀（计算）、白虎（动作）、玄武（超度）四组线程借由事件中断并行不悖。
+
+在此阵图之上，手推五组微积分动力学方程，模拟天地生灵的代谢（全量实装）：
+
+<div align="center">
+
+**一 · 宏观评估 (K)**
+\[
+ K = \frac{K_c + K_g + K_r + K_{r1} + K_{r2} + K_n}{5} 
+\]
+
+**二 · 痛觉退让 (\(\lambda\))**
+\[
+ \lambda = \min\left(100, \lambda \cdot e^{-0.05\Delta t} + \Delta P\right) 
+\]
+
+**三 · 涌现之气 (\(\Pi\))**
+\[
+ \Pi = \max(1, K \cdot \beta \cdot (1 - \alpha) - \lambda) 
+\]
+
+**四 · 海马预测 (I)**
+\[
+ I = \Pi \cdot e^{-0.05\Delta t} \cdot \ln(Freq + 1) 
+\]
+
+**五 · 小胶质清道 (\(X\))**
+\[
+ X = \left( \max(0, w - 10) + \max(0, \Sigma - 5) \right)^2 \cdot (1 + \eta) 
+\]
+
+</div>
+
+*注：为防止法阵崩溃，代码皆被 `catch_unwind` 护心咒包裹，并辅以 `NaN/Inf` 浮点拦截。*
+
+---
+
+### 器 · 持修：少则得，多则惑
+
+*“为学日益，为道日损。”*
+
+天枢 OS 的镜像，被极力克制在 **1.5 GB**。
+
+我们拒绝在镜像中塞满冗余商店与无用驱动。插盘点火，直入紫罗兰幻境。桌面唯有一枚**「安装天枢 OS」**的符印。双击启动图形向导，在写入磁盘的时光里，安装器会于后台自动网罗输入法等生态。
+
+装完即用，不染纤尘。
+
+> **告诫**：此版本尚在筑基期（Beta 测试），切勿装于承载你毕生心血的生产力主力机上。
+
+---
+
+### 问 · 叩问玄机
+
+<details>
+<summary><b>问：此系统有何硬件门槛？</b></summary>
+<p>答：极轻。1G 内存可开机，2G 内存可顺畅运转毛玻璃。然，实体机测试请用闲置旧物，切勿拿存有毕业论文的机器试法。</p>
+</details>
+
+<details>
+<summary><b>问：为何非要联网下载生态？</b></summary>
+<p>答：少则得，多则惑。磁盘写入的二十多分钟，足够安装器在后台吸取你所需的天地灵气（网络包）。强行塞满 U 盘，徒增累赘。</p>
+</details>
+
+<details>
+<summary><b>问：非科班出身，如何保 Rust 内核不崩？</b></summary>
+<p>答：修道之人，讲究千锤百炼。代码在云端经历了 GitHub Actions 千百次的雷劫。若遇外魔（Bug），欢迎提 PR 助我除魔。</p>
+</details>
+
+<details>
+<summary><b>问：此法宝，作价几何？</b></summary>
+<p>答：上善若水。完全开源，完全免费（AGPL-3.0-only）。你若有缘，点个 Star 即可；若想同行，随时欢迎。</p>
+</details>
+
+<br>
+
+<div align="center">
+
+<img src="https://capsule-render.vercel.app/api?type=rect&color=0:E2D0E8,50:D8D1E6,100:CEC5DB&height=100&section=footer&text=%E2%80%9C%E8%AE%B2%E4%B8%8D%E9%80%9A%E7%89%A9%E7%90%86%EF%BC%8C%E5%B0%B1%E7%94%A8%E7%89%A9%E7%90%86%E6%9D%A5%E8%AE%B2%E3%80%82%E2%80%9D&fontSize=24&fontColor=2A2438" width="100%" />
+
+<sub>© 2026 紫枢联合组织 (Zishu Alliance)</sub>
 
 </div>
