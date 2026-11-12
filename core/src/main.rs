@@ -188,7 +188,7 @@ fn main() {
                 b.dt = dt;
                 b.cpu_usage = sys.global_cpu_info().cpu_usage() / 100.0;
                 b.mem_usage = if sys.total_memory() == 0 { 0.0 } else { sys.used_memory() as f32 / sys.total_memory() as f32 };
-                b.load_avg = (sys.load_average().one / 8.0).min(1.0);
+                b.load_avg = (sysinfo::System::load_average().one / 8.0).min(1.0);
                 b.cpu_temp = pick_cpu_temp(&comps);
             }));
             thread::sleep(Duration::from_millis(250));
