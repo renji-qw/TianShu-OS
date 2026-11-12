@@ -13,16 +13,12 @@ export RUSTUP_DIST_SERVER="https://rsproxy.cn"
 rustup default stable && rustup target add x86_64-unknown-linux-musl
 (cd core && RUSTFLAGS="-C target-cpu=x86-64" cargo build --release --target x86_64-unknown-linux-musl)
 
-# 2.5 初始化并填充密钥环，解决 CachyOS 签名未知的问题
+# 2.5 初始化并填充密钥环（关键：先装 cachyos-keyring，再 populate）
 echo "==> 初始化 CachyOS 密钥环..."
 pacman-key --init
-pacman-key --populate archlinux cachyos
-
-# 从 Ubuntu 密钥服务器获取并签名 CachyOS 的构建密钥
-pacman-key --recv-keys F3B607488DB35A47 --keyserver keyserver.ubuntu.com
-pacman-key --lsign-key F3B607488DB35A47
-
-# 更新 keyring 包以确保本地密钥库是最新的
+pacman-key --populate archlinux
+pacman -U --noconfirm https://mirror.cachyos.org/repo/x86_64/cachyos/cachyos-keyring-3-1-any.pkg.tar.zst
+pacman-key --populate cachyos
 pacman -Sy --noconfirm archlinux-keyring cachyos-keyring
 
 # 3. 拉取 CachyOS 官方构建仓库
