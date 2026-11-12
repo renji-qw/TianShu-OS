@@ -13,12 +13,27 @@ export RUSTUP_DIST_SERVER="https://rsproxy.cn"
 rustup default stable && rustup target add x86_64-unknown-linux-musl
 (cd core && RUSTFLAGS="-C target-cpu=x86-64" cargo build --release --target x86_64-unknown-linux-musl)
 
-# 2.5 初始化并填充密钥环（关键：先装 cachyos-keyring，再 populate）
-echo "==> 初始化 CachyOS 密钥环..."
+ # 2.5 彻底重置并修复 CachyOS 密钥环
+echo "==> 重置并初始化密钥环..."
+# 1. 彻底删除可能损坏的 GPG 数据库
+rm -rf /etc/pacman.d/gnupg/
+
+# 2. 重新初始化
 pacman-key --init
+
+# 3. 导入 Arch Linux 官方密钥
 pacman-key --populate archlinux
-pacman -U --noconfirm https://mirror.cachyos.org/repo/x86_64/cachyos/cachyos-keyring-3-1-any.pkg.tar.zst
-pacman-key --populate cachyos
+
+# 4. 从 Ubuntu 密钥服务器获取 CachyOS 签名密钥 (F3B607488DB35A47)[reference:2]
+pacman-key --recv-keys F3B607488DB35A47 --keyserver keyserver.ubuntu.com
+
+# 5. 本地签名，标记为信任
+pacman-key --lsign-key F3B607488DB35A47
+
+# 6. 重启时间同步服务，确保系统时间准确（签名验证对时间敏感）
+systemctl restart systemd-timesyncd 2>/dev/null || true
+
+# 7. 更新 keyring 包到最新版本
 pacman -Sy --noconfirm archlinux-keyring cachyos-keyring
 
 # 3. 拉取 CachyOS 官方构建仓库
