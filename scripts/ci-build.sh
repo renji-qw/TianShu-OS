@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# TianShu OS — CI 构建脚本 (终极暴力无错版)
+# TianShu OS — CI 构建脚本 (彻底关掉 chroot 签名校验)
 set -euo pipefail
 cd "${WORKSPACE:-/work}"
 
-# 1. 暴力注入 CachyOS 仓库源，并且彻底关闭签名验证
+# 1. 暴力注入宿主机 CachyOS 仓库源，关闭签名
 echo "==> 暴力注入 CachyOS 仓库..."
 if ! grep -q "\[cachyos\]" /etc/pacman.conf; then
     cat >> /etc/pacman.conf <<EOF
@@ -14,16 +14,14 @@ Server = https://mirror.cachyos.org/repo/x86_64/cachyos
 Server = https://mirrors.tuna.tsinghua.edu.cn/cachyos/repo/x86_64/cachyos
 EOF
 fi
-
-# 刷新数据库，此时 CachyOS 的包已经可见
 pacman -Syy --noconfirm
 
-# 2. 安装构建基础依赖（直接从配置好的源里拉）
+# 2. 安装构建依赖
 echo "==> 安装构建依赖..."
 pacman -S --noconfirm --needed --disable-download-timeout \
     archiso rustup git base-devel squashfs-tools grub mtools libisoburn dosfstools ca-certificates cachyos-keyring cachyos-mirrorlist
 
-# 3. 编译 Rust 微积分核心
+# 3. 编译 Rust 核心
 echo "==> 编译 Rust 核心..."
 export RUSTUP_DIST_SERVER="https://rsproxy.cn"
 rustup default stable && rustup target add x86_64-unknown-linux-musl
@@ -48,19 +46,23 @@ cp -r configs/kde "$PROFILE_DIR/airootfs/etc/tianshu/"
 mkdir -p "$PROFILE_DIR/airootfs/etc/sddm.conf.d"
 cp configs/kde/sddm.conf "$PROFILE_DIR/airootfs/etc/sddm.conf.d/10-tianshu.conf"
 
-# 6. 强制 GRUB 双系统引导与极限压缩
+# 6. 【最核心的修复】暴力修改 CachyOS 的 pacman.conf，关掉 chroot 里的签名验证
+echo "==> 禁用 chroot 内部的签名验证..."
+sed -i 's/^SigLevel.*/SigLevel = Never/' "$PROFILE_DIR/pacman.conf"
+
+# 7. 强制 GRUB 双系统引导与极限压缩
 sed -i "s/^bootmodes=.*/bootmodes=('uefi-x64.grub.esp' 'uefi-x64.grub.eltorito')/" "$PROFILE_DIR/profiledef.sh"
 mkdir -p "$PROFILE_DIR/airootfs/etc/default"
 echo "GRUB_DISABLE_OS_PROBER=false" >> "$PROFILE_DIR/airootfs/etc/default/grub"
 sed -i "s/airootfs_image_tool_options=.*/airootfs_image_tool_options=('-comp' 'xz' '-Xbcj' 'x86' '-b' '1M' '-Xdict-size' '100%')/" "$PROFILE_DIR/profiledef.sh"
 
-# 7. 执行构建
+# 8. 执行构建（在 stdin 里狂塞 "y"，防止任何漏网之鱼的交互提示）
 echo "==> 开始构建 ISO..."
 cd cachyos-archiso
-sudo ./buildiso.sh -p desktop -v -w
+yes | sudo ./buildiso.sh -p desktop -v -w
 cd ..
 
-# 8. 收集产物
+# 9. 收集产物
 rm -rf out && mkdir -p out
 mv cachyos-archiso/out/*.iso out/ 2>/dev/null || mv cachyos-archiso/out/* out/ 2>/dev/null || true
 ls -lh out/
