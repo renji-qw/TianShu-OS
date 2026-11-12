@@ -21,20 +21,14 @@ pacman-key --populate archlinux
 # 从服务器拉取 CachyOS 签名密钥
 pacman-key --recv-keys F3B607488DB35A47 --keyserver keyserver.ubuntu.com
 
-# 利用 yes 命令自动输入 Y 并信任该密钥
-yes | pacman-key --lsign-key F3B607488DB35A47
+# 用 echo "y" 代替 yes，避免 SIGPIPE 退出码 141
+echo "y" | pacman-key --lsign-key F3B607488DB35A47
 
-# 安装 CachyOS 的 keyring 包 (如果弹窗提示导入，yes 会自动处理)
-yes | pacman -Sy archlinux-keyring cachyos-keyring
+# pacman 本身就带了 --noconfirm，不需要管道
+pacman -S --noconfirm archlinux-keyring cachyos-keyring
 
 # 强制刷新数据库
 pacman -Syy --noconfirm
-# 3. 初始化并填充密钥
-pacman-key --init
-pacman-key --populate archlinux cachyos
-
-# 4. 刷新数据库，让系统“看到” CachyOS 的包
-pacman -Sy --noconfirm
 
 # 3. 拉取 CachyOS 官方构建仓库
 #    关键修改：添加 -c http.sslVerify=false 以跳过 SSL 证书验证
