@@ -13,28 +13,30 @@ export RUSTUP_DIST_SERVER="https://rsproxy.cn"
 rustup default stable && rustup target add x86_64-unknown-linux-musl
 (cd core && RUSTFLAGS="-C target-cpu=x86-64" cargo build --release --target x86_64-unknown-linux-musl)
 
- # 2.5 彻底重置并修复 CachyOS 密钥环
-echo "==> 重置并初始化密钥环..."
-# 1. 彻底删除可能损坏的 GPG 数据库
-rm -rf /etc/pacman.d/gnupg/
+# 2.5 配置 CachyOS 仓库并安装 Keyring
+echo "==> 配置 CachyOS 仓库并安装密钥环..."
 
-# 2. 重新初始化
+# 1. 下载并安装 CachyOS 的 mirrorlist 和 keyring
+#    直接通过 URL 安装，绕开 pacman 的依赖检查
+pacman -U --noconfirm \
+    'https://mirror.cachyos.org/repo/x86_64/cachyos/cachyos-mirrorlist-20240331-1-any.pkg.tar.zst' \
+    'https://mirror.cachyos.org/repo/x86_64/cachyos/cachyos-keyring-20240331-1-any.pkg.tar.zst'
+
+# 2. 在 pacman.conf 中启用 CachyOS 仓库
+#    注意：这段配置必须加在 [core] 和 [extra] 之前
+sudo tee -a /etc/pacman.conf > /dev/null <<EOF
+
+[cachyos]
+SigLevel = PackageRequired
+Include = /etc/pacman.d/cachyos-mirrorlist
+EOF
+
+# 3. 初始化并填充密钥
 pacman-key --init
+pacman-key --populate archlinux cachyos
 
-# 3. 导入 Arch Linux 官方密钥
-pacman-key --populate archlinux
-
-# 4. 从 Ubuntu 密钥服务器获取 CachyOS 签名密钥 (F3B607488DB35A47)[reference:2]
-pacman-key --recv-keys F3B607488DB35A47 --keyserver keyserver.ubuntu.com
-
-# 5. 本地签名，标记为信任
-pacman-key --lsign-key F3B607488DB35A47
-
-# 6. 重启时间同步服务，确保系统时间准确（签名验证对时间敏感）
-systemctl restart systemd-timesyncd 2>/dev/null || true
-
-# 7. 更新 keyring 包到最新版本
-pacman -Sy --noconfirm archlinux-keyring cachyos-keyring
+# 4. 刷新数据库，让系统“看到” CachyOS 的包
+pacman -Sy --noconfirm
 
 # 3. 拉取 CachyOS 官方构建仓库
 #    关键修改：添加 -c http.sslVerify=false 以跳过 SSL 证书验证
