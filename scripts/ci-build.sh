@@ -19,8 +19,10 @@ sudo rm -R /etc/pacman.d/gnupg
 pacman-key --init
 pacman-key --populate archlinux
 
-# 强制同步系统时间，避免因时间偏差导致签名失效
-sudo systemctl restart systemd-timesyncd
+# 修复时间同步：容器内没有 systemd，改用 ntpdate
+echo "==> 同步系统时间..."
+pacman -S --noconfirm ntp
+ntpdate -u pool.ntp.org || true
 
 # 从 Ubuntu 密钥服务器获取并信任 CachyOS 的签名密钥
 pacman-key --recv-keys F3B607488DB35A47 --keyserver keyserver.ubuntu.com
