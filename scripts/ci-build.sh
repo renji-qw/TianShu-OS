@@ -56,13 +56,13 @@ mkdir -p "$PROFILE_DIR/airootfs/etc/default"
 echo "GRUB_DISABLE_OS_PROBER=false" >> "$PROFILE_DIR/airootfs/etc/default/grub"
 sed -i "s/airootfs_image_tool_options=.*/airootfs_image_tool_options=('-comp' 'xz' '-Xbcj' 'x86' '-b' '1M' '-Xdict-size' '100%')/" "$PROFILE_DIR/profiledef.sh"
 
-# 8. 执行构建（在 stdin 里狂塞 "y"，防止任何漏网之鱼的交互提示）
+# 8. 执行构建（去掉了 yes，防止 SIGPIPE 141 报错）
 echo "==> 开始构建 ISO..."
 cd cachyos-archiso
-yes | sudo ./buildiso.sh -p desktop -v -w
+sudo ./buildiso.sh -p desktop -v -w
 cd ..
 
-# 9. 收集产物
+# 9. 收集产物（修复路径，精准抓取子目录里的 ISO）
 rm -rf out && mkdir -p out
-mv cachyos-archiso/out/*.iso out/ 2>/dev/null || mv cachyos-archiso/out/* out/ 2>/dev/null || true
+find cachyos-archiso/out -name "*.iso" -exec mv {} out/ \;
 ls -lh out/
