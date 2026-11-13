@@ -1,64 +1,35 @@
-name: TianShu OS
-permissions:
-  contents: write
+name: TianShu Build
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 120
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Free disk space on host
+      - name: Run Build Script
         run: |
-          set -x
-          df -h /
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
-            /opt/hostedtoolcache /usr/local/share/boost /usr/lib/jvm \
-            /usr/share/swift /usr/local/.ghcup /usr/local/lib/node_modules \
-            /opt/az /usr/local/aws-cli 2>/dev/null || true
-          sudo docker system prune -af || true
-          df -h /
+          docker run --rm --privileged -v "$PWD":/work -w /work archlinux:latest bash /work/scripts/ci-build.sh
 
-      - name: Build ISO in Arch container
-        run: |
-          set -euo pipefail
-          docker pull archlinux:latest
-          mkdir -p out
-          docker run --rm --privileged \
-            -v "$PWD":/work \
-            -w /work -e WORKSPACE=/work \
-            archlinux:latest bash /work/scripts/ci-build.sh
-          df -h /
-
-      - name: - name: Fix Permissions
+      - name: Fix Permissions
         run: sudo chown -R $(id -u):$(id -g) out/
 
-      - name: Inspect airootfs size
-        if: always()
-        run: |
-          if [ -d airootfs ]; then
-            echo "### airootfs top 40" >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            du -xh airootfs 2>/dev/null | sort -h | tail -40 | tee -a "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-      # ⚠️ 这里原本有一个 Extreme Compress ISO 的步骤，我已经帮你删掉了！因为 ci-build.sh 已经压好了！
-
-      - name: Enforce GitHub Release 2GB limit
-        run: |
-          set -euxo pipefail
-          LIMIT=2147483648
-          # 去 out 目录里找 .xz 后缀的文件
-          FILE=$(find out -maxdepth 1 -name '*.iso.xz' -print -quit)
-          test -n "$FILE"
-          SIZE=$(stat -c%s "$FILE")
-          echo "镜像大小: $SIZE bytes ($(numfmt --to=iec "$SIZE"))" | tee -a "$GITHUB_STEP_SUMMARY"
-          if [ "$SIZE" -ge "$LIMIT" ]; then
-            echo "::error::ISO.xz 
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.1-beta
+          name: TianShu OS v1.0.1-beta
+          files: out/*
+          overwrite_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
