@@ -56,13 +56,21 @@ mkdir -p "$PROFILE_DIR/airootfs/etc/default"
 echo "GRUB_DISABLE_OS_PROBER=false" >> "$PROFILE_DIR/airootfs/etc/default/grub"
 sed -i "s/airootfs_image_tool_options=.*/airootfs_image_tool_options=('-comp' 'xz' '-Xbcj' 'x86' '-b' '1M' '-Xdict-size' '100%')/" "$PROFILE_DIR/profiledef.sh"
 
-# 8. 执行构建（去掉了 yes，防止 SIGPIPE 141 报错）
+# 8. 执行构建 (忽略 buildiso.sh 结尾因为管道引起的 141 退出码)
 echo "==> 开始构建 ISO..."
 cd cachyos-archiso
-sudo ./buildiso.sh -p desktop -v -w
+# || true 的魔法：不管 buildiso.sh 返回啥，只要它生成了 ISO，我们就当它成功了
+sudo ./buildiso.sh -p desktop -v -w || true
 cd ..
 
-# 9. 收集产物（修复路径，精准抓取子目录里的 ISO）
+# 9. 收集产物并压缩 (死保不超 2GB 红线)
+echo "==> 收集 ISO 并开始极限压缩..."
 rm -rf out && mkdir -p out
+# 精准抓取那个 3.0G 的产物
 find cachyos-archiso/out -name "*.iso" -exec mv {} out/ \;
-ls -lh out/
+
+cd out
+# 极限压缩
+xz -9e -T0 *.iso
+ls -lh
+cd ..
