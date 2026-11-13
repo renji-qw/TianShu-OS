@@ -51,8 +51,7 @@ fi
 sed -i 's/^SigLevel.*/SigLevel = Never/' "$PROFILE_DIR/pacman.conf"
 
 # 强制 GRUB 双系统引导与极限压缩
-sed -i "s/^bootmodes=.*/bootmodes=('uefi-x64.grub.esp' 'uefi-x64.grub.eltorito')/" "$PROFILE_DIR/profiledef.sh"
-
+sed -i "s/^bootmodes=.*/bootmodes=('bios.syslinux.mbr' 'bios.syslinux.eltorito' 'uefi-x64.grub.esp' 'uefi-x64.grub.eltorito')/" "$PROFILE_DIR/profiledef.sh"
 # 【修复你报错的 56 行】防呆机制：确保目录和文件都存在
 mkdir -p "$PROFILE_DIR/airootfs/etc/default"
 touch "$PROFILE_DIR/airootfs/etc/default/grub"
