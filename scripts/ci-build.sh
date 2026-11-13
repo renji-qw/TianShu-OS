@@ -63,14 +63,30 @@ cd cachyos-archiso
 sudo ./buildiso.sh -p desktop -v -w || true
 cd ..
 
-# 9. 收集产物并压缩 (死保不超 2GB 红线)
-echo "==> 收集 ISO 并开始极限压缩..."
-rm -rf out && mkdir -p out
-# 精准抓取那个 3.0G 的产物
-find cachyos-archiso/out -name "*.iso" -exec mv {} out/ \;
-
-cd out
-# 极限压缩
-xz -9e -T0 *.iso
-ls -lh
-cd ..
+- name: Extreme Compress ISO
+  run: |
+    set -euxo pipefail
+    
+    # 1. 直接在整个工作区地毯式搜索 .iso 文件，并复制到根目录的 out 文件夹
+    mkdir -p out
+    find . -name "*.iso" -exec cp {} out/ \;
+    
+    # 2. 进入 out 目录
+    cd out
+    
+    # 3. 检查一下到底有没有找到文件，如果没有就直接报错
+    ls -lh
+    if ! ls *.iso >/dev/null 2>&1; then
+      echo "::error:: 没找到任何 ISO 文件，请检查上一步构建日志！"
+      exit 1
+    fi
+    
+    # 4. 极限压缩
+    for f in *.iso; do
+      echo "开始压缩 $f..."
+      xz -9e -T0 "$f"
+    done
+    
+    # 5. 生成校验和
+    sha256sum *.iso.xz > SHA256SUMS
+    ls -lh
