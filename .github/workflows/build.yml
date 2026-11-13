@@ -1,4 +1,4 @@
-name: TianShu Build
+name: Build
 
 on:
   workflow_dispatch:
@@ -14,21 +14,46 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Run Build Script
+      - name: Run ci-build.sh
         run: |
           docker run --rm --privileged -v "$PWD":/work -w /work archlinux:latest bash /work/scripts/ci-build.sh
 
       - name: Fix Permissions
         run: sudo chown -R $(id -u):$(id -g) out/
 
-      - name: Publish Release
+      # 【新增】万一 Release 还是出问题，你可以直接从 Artifacts 下载！
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TianShu-ISO
+          path: out/*.xz
+
+      # 【核心修复】如果超过 2GB，直接无脑切片！
+      - name: Split Over-2GB Files
+        run: |
+          cd out
+          # 找到 .iso.xz 文件
+          FILE=$(find . -maxdepth 1 -name '*.iso.xz' -print -quit)
+          if [ -n "$FILE" ]; then
+            SIZE=$(stat -c%s "$FILE")
+            LIMIT=2147483648
+             f [ -n "$FILE" ]; then
+            SIZE=$(stat -c%s "$FILE")
+            LIMIT=2147483648
+            if [ "$SIZE" -ge "$LIMIT" ]; then
+              echo "文件超过 2GB，启动切片..."
+              split -b 1500M -d -a 2 "$FILE" "${FILE}.part-"
+              rm -f "$FILE" # 删掉原文件防止超限
+              ls -lh
+            fi
+          fi
+
+      - name: Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.1-beta
-          name: TianShu OS v1.0.1-beta
           files: out/*
           overwrite_files: true
         env:
