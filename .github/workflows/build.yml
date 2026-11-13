@@ -1,55 +1,26 @@
 name: Build
-
-on:
-  workflow_dispatch:
-  push:
-    branches:
-      - main
-
+on: [push, workflow_dispatch]
 permissions:
   contents: write
-
 jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
-
-      - name: Run ci-build.sh
+      
+      - name: Build and Split
         run: |
           docker run --rm --privileged -v "$PWD":/work -w /work archlinux:latest bash /work/scripts/ci-build.sh
-
-      - name: Fix Permissions
-        run: sudo chown -R $(id -u):$(id -g) out/
-
-      # 【新增】万一 Release 还是出问题，你可以直接从 Artifacts 下载！
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: TianShu-ISO
-          path: out/*.xz
-
-      # 【核心修复】如果超过 2GB，直接无脑切片！
-      - name: Split Over-2GB Files
-        run: |
+          sudo chown -R $(id -u):$(id -g) out
           cd out
-          # 找到 .iso.xz 文件
-          FILE=$(find . -maxdepth 1 -name '*.iso.xz' -print -quit)
-          if [ -n "$FILE" ]; then
-            SIZE=$(stat -c%s "$FILE")
-            LIMIT=2147483648
-             f [ -n "$FILE" ]; then
-            SIZE=$(stat -c%s "$FILE")
-            LIMIT=2147483648
-            if [ "$SIZE" -ge "$LIMIT" ]; then
-              echo "文件超过 2GB，启动切片..."
-              split -b 1500M -d -a 2 "$FILE" "${FILE}.part-"
-              rm -f "$FILE" # 删掉原文件防止超限
-              ls -lh
+          for f in *.xz; do
+            if [ "$(stat -c%s "$f" 2>/dev/null)" -ge 2000000000 ]; then
+              split -b 1500M -d -a 2 "$f" "${f}.part-"
+              rm -f "$f"
             fi
-          fi
-
+          done
+          
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
