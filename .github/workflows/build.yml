@@ -7,10 +7,17 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
+      
+      # 强制修复脚本换行符，防止格式错误导致 127
+      - name: Fix CRLF
+        run: sed -i 's/\r$//' scripts/*.sh
+
       - name: Build
         run: docker run --rm --privileged -v "$PWD":/work -w /work archlinux:latest bash /work/scripts/ci-build.sh
+        
       - name: Fix Perms
         run: sudo chown -R $(id -u):$(id -g) out/
+        
       - name: Split & Release
         run: |
           find out -maxdepth 1 -name "*.iso.xz" -size +2147483648c -exec split -b 1500M -d -a 2 {} {}.part- \; -exec rm -f {} \;
