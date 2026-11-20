@@ -1,31 +1,19 @@
 name: Build
-on: [push, workflow_dispatch]
-permissions:
-  contents: write
+on: [workflow_dispatch, push]
+permissions: { contents: write }
 jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Build and Split
+      - name: Build
+        run: docker run --rm --privileged -v "$PWD":/work -w /work archlinux:latest bash /work/scripts/ci-build.sh
+      - name: Fix Perms
+        run: sudo chown -R $(id -u):$(id -g) out/
+      - name: Split & Release
         run: |
-          docker run --rm --privileged -v "$PWD":/work -w /work archlinux:latest bash /work/scripts/ci-build.sh
-          sudo chown -R $(id -u):$(id -g) out
-          cd out
-          for f in *.xz; do
-            if [ "$(stat -c%s "$f" 2>/dev/null)" -ge 2000000000 ]; then
-              split -b 1500M -d -a 2 "$f" "${f}.part-"
-              rm -f "$f"
-            fi
-          done
-          
-      - name: Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v1.0.1-beta
-          files: out/*
-          overwrite_files: true
+          find out -maxdepth 1 -name "*.iso.xz" -size +2147483648c -exec split -b 1500M -d -a 2 {} {}.part- \; -exec rm -f {} \;
+          cd out && ls | xargs -I {} gh release upload v1.0.2-stable {} --clobber || true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
