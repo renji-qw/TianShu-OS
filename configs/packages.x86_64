@@ -1,36 +1,19 @@
-# ==========================================
-# CachyOS 灵魂组件（必须保留，提供图形化安装向导与极速内核）
-# ==========================================
-cachyos-hello
 cachyos-calamares
-cachyos-settings
 cachyos-keyring
 cachyos-mirrorlist
 linux-cachyos
 linux-firmware
-
-# ==========================================
-# 核心系统与底层驱动
-# ==========================================
 base
 systemd
 sudo
 polkit
 mesa
-
-# ==========================================
-# 网络组件（确保用户开机就能联网，后续才能自动下生态）
-# ==========================================
 networkmanager
 wpa_supplicant
 dhcpcd
 modemmanager
 usb_modeswitch
 iw
-
-# ==========================================
-# 文件系统、分区与双系统引导工具（保命必备）
-# ==========================================
 e2fsprogs
 btrfs-progs
 dosfstools
@@ -41,43 +24,10 @@ lvm2
 grub
 efibootmgr
 os-prober
-
-# ==========================================
-# KDE 紫罗兰桌面（极简基础版）
-# ==========================================
-plasma-desktop
-plasma-workspace
-plasma-nm
-plasma-pa
-systemsettings
-xdg-desktop-portal-kde
-kwin
-breeze
-breeze-icons
-sddm
-dolphin
-konsole
-ark
-spectacle
-kate
-
-# ==========================================
-# 声音与基础字体
-# ==========================================
-pipewire
-pipewire-pulse
-pipewire-alsa
-wireplumber
-sof-firmware
+xorg-server
+xorg-xinit
+openbox
+xterm
 noto-fonts-cjk
 noto-fonts
-noto-fonts-emoji
-
-# ==========================================
-# 老机器优化与小工具
-# ==========================================
 zram-generator
-tlp
-nano
-curl
-bc
