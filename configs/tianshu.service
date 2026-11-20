@@ -35,8 +35,8 @@ LimitMEMLOCK=infinity
 # 防爆核心转储文件
 LimitCORE=0
 
-# 限制最大内存占用（防泄漏，已放宽至 2G 以适应高预留场景）
-MemoryMax=2G
+MemoryHigh=512M
+MemoryMax=1G
 
 # 进程被清理时只杀主进程
 KillMode=process
