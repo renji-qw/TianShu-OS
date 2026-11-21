@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # 只改本文件。输入只用仓库现成的 configs/ scripts/ core/，不新增任何文件。
-# env: KEEP_OFFLINE_IN_ISO=1 / COMPRESS=none|zstd|xz / EXTRA_PACKAGES / VERBOSE=1
+# env: COMPRESS=xz(默认)|none / EXTRA_PACKAGES / VERBOSE=1 / KEEP_OFFLINE_IN_ISO=0(才关)
+# 推送/切片由 build.yml 的 Split & Release 负责，本脚本只出 out/*.iso.xz
 set -euo pipefail
 
 R="$(cd "${WORKSPACE:-/work}" && pwd)"
@@ -82,8 +83,8 @@ find "$P/grub" "$P/syslinux" "$P/efiboot" -type f \
   \( -name '*.cfg' -o -name '*.conf' \) \
   -exec sed -i 's/CachyOS/TS OS/g' {} + 2>/dev/null || true
 
-log "6 离线仓库"
-K="${KEEP_OFFLINE_IN_ISO:-0}"
+log "6 离线仓库(进ISO)"
+K="${KEEP_OFFLINE_IN_ISO:-1}"
 if [ "$K" = "1" ]; then OFF="$P/airootfs/opt/offline_repo"
 else OFF="$R/cachyos-archiso/offline_cache"; fi
 mkdir -p "$OFF"   # 372 行根因
@@ -124,11 +125,11 @@ mapfile -t isos < <(find "$OUT" -type f -name '*.iso' | sort)
 (( ${#isos[@]} > 0 )) || die "没有 ISO"
 cp -- "${isos[@]}" out/
 cd out
-case "${COMPRESS:-zstd}" in
-  zstd) zstd -q -T0 -10 -- *.iso ;;
+# 必须出 *.iso.xz：build.yml 的 Split & Release 只 find 这个后缀
+case "${COMPRESS:-xz}" in
   xz)   xz -q -9e -T2 -- *.iso ;;
   none) : ;;
-  *)    die "COMPRESS 只支持 none/zstd/xz" ;;
+  *)    die "COMPRESS 只支持 xz/none" ;;
 esac
 ls -lh
 log "完成"
