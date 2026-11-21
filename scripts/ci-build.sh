@@ -1,140 +1,134 @@
 #!/usr/bin/env bash
-# TS OS CI 构建。同目录放 util-iso.sh / profiledef.sh / customize_airootfs.sh /
-# packages_desktop.x86_64 / tianshu.service(可选)。
-# 环境变量：KEEP_OFFLINE_IN_ISO=1、COMPRESS=none|zstd|xz(默认zstd)、EXTRA_PACKAGES、VERBOSE=1
+# 只改本文件。输入只用仓库现成的 configs/ scripts/ core/，不新增任何文件。
+# env: KEEP_OFFLINE_IN_ISO=1 / COMPRESS=none|zstd|xz / EXTRA_PACKAGES / VERBOSE=1
 set -euo pipefail
 
-cd "${WORKSPACE:-/work}"
-P="cachyos-archiso/archiso"
-ISO_SRC="cachyos-archiso/out"
-PATCH_DIR="${PATCH_DIR:-$(cd "$(dirname "$(readlink -f "$0")")" && pwd)}"
+R="$(cd "${WORKSPACE:-/work}" && pwd)"
+P="$R/cachyos-archiso/archiso"
+OUT="$R/cachyos-archiso/out"
 
-log() { printf '==> %s\n' "$*"; }
-die() { printf '!! %s\n' "$*" >&2; exit 1; }
-
-disable_sig() {
-    local f="$1"
-    [ -f "$f" ] || die "缺 $f"
-    sed -i -E 's/^[[:space:]]*SigLevel[[:space:]]*=.*/SigLevel = Never/' "$f"
-    grep -q '^SigLevel' "$f" || sed -i '/^\[options\]/a SigLevel = Never' "$f"
+log(){ printf '==> %s\n' "$*"; }
+die(){ printf '!! %s\n' "$*" >&2; exit 1; }
+sig(){
+  local f="$1"; [ -f "$f" ] || die "缺 $f"
+  sed -i -E 's/^[[:space:]]*SigLevel[[:space:]]*=.*/SigLevel = Never/' "$f"
+  grep -q '^SigLevel' "$f" || sed -i '/^\[options\]/a SigLevel = Never' "$f"
 }
 
-export TZ=UTC
-export USER="${USER:-root}"
+export TZ=UTC USER="${USER:-root}"
+cd "$R"
 
 log "0 环境"
-[ -f "$PATCH_DIR/util-iso.sh" ]   || die "缺 util-iso.sh"
-[ -f "$PATCH_DIR/profiledef.sh" ] || die "缺 profiledef.sh"
+[ -f configs/packages.x86_64 ]       || die "缺 configs/packages.x86_64"
+[ -f configs/tianshu.service ]       || die "缺 configs/tianshu.service"
+[ -f scripts/customize_airootfs.sh ] || die "缺 scripts/customize_airootfs.sh"
 
-log "1 pacman 配置"
-disable_sig /etc/pacman.conf
+log "1 依赖"
+sig /etc/pacman.conf
 pacman -Syy --noconfirm >/dev/null
 pacman -S --noconfirm --needed >/dev/null \
-    archiso mkinitcpio-archiso git base-devel rustup squashfs-tools \
-    grub mtools libisoburn dosfstools syslinux sudo \
-    curl musl gettext xz zstd
+  archiso mkinitcpio-archiso git base-devel rustup squashfs-tools \
+  grub mtools libisoburn dosfstools syslinux sudo curl musl gettext xz zstd python3
 
-log "2 编译 tianshu_core"
+log "2 core"
 export RUSTUP_DIST_SERVER="https://rsproxy.cn"
 rustup default stable >/dev/null
 rustup target add x86_64-unknown-linux-musl >/dev/null
 (cd core && RUSTFLAGS="-C target-cpu=x86-64" cargo build --release --target x86_64-unknown-linux-musl)
-CORE_BIN="core/target/x86_64-unknown-linux-musl/release/tianshu_core"
-[ -x "$CORE_BIN" ] || die "缺 $CORE_BIN"
+CORE="$R/core/target/x86_64-unknown-linux-musl/release/tianshu_core"
+[ -x "$CORE" ] || die "缺 $CORE"
 
 log "3 clone"
 rm -rf cachyos-archiso
 git -c http.sslVerify=false -c credential.helper= clone -q --depth 1 \
-    https://github.com/CachyOS/CachyOS-Live-ISO.git cachyos-archiso
+  https://github.com/CachyOS/CachyOS-Live-ISO.git cachyos-archiso
 [ -f "$P/profiledef.sh" ] || die "clone 失败"
 
-log "4 覆盖改动文件"
-cp "$PATCH_DIR/util-iso.sh"   cachyos-archiso/util-iso.sh
-cp "$PATCH_DIR/profiledef.sh" "$P/profiledef.sh"
-bash -n cachyos-archiso/util-iso.sh "$P/profiledef.sh" || die "改动文件语法错"
-grep -q 'iso_file="TS_OS.iso"' cachyos-archiso/util-iso.sh || die "util-iso.sh 版本不对"
-grep -q '^iso_label="TS_OS"' "$P/profiledef.sh"           || die "profiledef.sh 版本不对"
-find "$P/grub" "$P/syslinux" "$P/efiboot" -type f \
-    \( -name '*.cfg' -o -name '*.conf' \) \
-    -exec sed -i 's/CachyOS/TS OS/g' {} + 2>/dev/null || true
-disable_sig "$P/pacman.conf"
-[ -f "$P/airootfs/etc/pacman.conf" ] || cp "$P/pacman.conf" "$P/airootfs/etc/pacman.conf"
-disable_sig "$P/airootfs/etc/pacman.conf"
+log "4 现场改上游"
+python3 - cachyos-archiso <<'PY'
+import pathlib, re, sys
+r = pathlib.Path(sys.argv[1])
+u = r/"util-iso.sh"; s = u.read_text()
+s = s.replace('    iso_file=$(gen_iso_fn).iso', '    iso_file="TS_OS.iso"')
+ls = s.splitlines()
+for i, l in enumerate(ls):
+    if l.lstrip().startswith('mv ') and 'cachyos-$(date' in l and 'iso_file' in l:
+        ls[i] = '    mv -f "$(find "$outFolder/$_profile" -maxdepth 1 -name "*.iso" -printf "%T@ %p\\n" | sort -rn | head -1 | cut -d" " -f2-)" "$outFolder/$_profile/${iso_file}"'
+u.write_text("\n".join(ls) + "\n")
+p = r/"archiso/profiledef.sh"; s = p.read_text()
+for k, v in {'iso_name':'tianshu','iso_label':'TS_OS','iso_publisher':'TS OS',
+             'iso_application':'TS OS Live ISO','iso_version':'1.0'}.items():
+    s = re.sub(r'^'+k+r'=.*$', k+'="'+v+'"', s, count=1, flags=re.M)
+p.write_text(s)
+PY
+bash -n cachyos-archiso/util-iso.sh "$P/profiledef.sh" || die "patch 后语法错"
+grep -q 'TS_OS.iso' cachyos-archiso/util-iso.sh || die "util-iso.sh patch 失败"
+grep -q '^iso_label="TS_OS"' "$P/profiledef.sh" || die "profiledef.sh patch 失败"
 
-log "5 注入定制内容"
-install -Dm755 "$PATCH_DIR/customize_airootfs.sh" "$P/airootfs/root/customize_airootfs.sh"
-install -Dm755 "$CORE_BIN" "$P/airootfs/usr/bin/tianshu_core"
-if [ -f "$PATCH_DIR/tianshu.service" ]; then
-    install -Dm644 "$PATCH_DIR/tianshu.service" "$P/airootfs/etc/systemd/system/tianshu.service"
-fi
-# 写 packages_desktop.x86_64，buildiso.sh 会 cp 成 packages.x86_64
-if [ -f "$PATCH_DIR/packages_desktop.x86_64" ]; then
-    cp "$PATCH_DIR/packages_desktop.x86_64" "$P/packages_desktop.x86_64"
-fi
+log "5 注入"
+# prepare_profile 会 cp packages_desktop.x86_64 → packages.x86_64，故写前者
+cp configs/packages.x86_64 "$P/packages_desktop.x86_64"
+install -Dm755 scripts/customize_airootfs.sh "$P/airootfs/root/customize_airootfs.sh"
+install -Dm755 "$CORE" "$P/airootfs/usr/bin/tianshu_core"
+install -Dm644 configs/tianshu.service "$P/airootfs/etc/systemd/system/tianshu.service"
 if [ -n "${EXTRA_PACKAGES:-}" ]; then
-    # shellcheck disable=SC2086
-    printf '%s\n' $EXTRA_PACKAGES >> "$P/packages_desktop.x86_64"
+  # shellcheck disable=SC2086
+  printf '%s\n' $EXTRA_PACKAGES >> "$P/packages_desktop.x86_64"
 fi
+sig "$P/pacman.conf"
+[ -f "$P/airootfs/etc/pacman.conf" ] || cp "$P/pacman.conf" "$P/airootfs/etc/pacman.conf"
+sig "$P/airootfs/etc/pacman.conf"
+find "$P/grub" "$P/syslinux" "$P/efiboot" -type f \
+  \( -name '*.cfg' -o -name '*.conf' \) \
+  -exec sed -i 's/CachyOS/TS OS/g' {} + 2>/dev/null || true
 
 log "6 离线仓库"
-KEEP_OFFLINE_IN_ISO="${KEEP_OFFLINE_IN_ISO:-0}"
-if [ "$KEEP_OFFLINE_IN_ISO" = "1" ]; then
-    OFFLINE="$P/airootfs/opt/offline_repo"
-else
-    OFFLINE="cachyos-archiso/offline_cache"
-fi
-mkdir -p "$OFFLINE"   # 372 行报错根因
-
-if [ "$KEEP_OFFLINE_IN_ISO" = "1" ]; then
-    PKGLIST="$P/packages_desktop.x86_64"
-    [ -f "$PKGLIST" ] || die "缺 $PKGLIST"
-    mapfile -t pkg_list < <(awk 'NF && $1 !~ /^#/ {print $1}' "$PKGLIST")
-    (( ${#pkg_list[@]} > 0 )) || die "包清单为空"
-    grep -q '^\[cachyos\]' /etc/pacman.conf || printf '\n[cachyos]\nSigLevel = Never\nServer = https://mirror.cachyos.org/repo/x86_64/cachyos\n' >> /etc/pacman.conf
-    pacman -Syy --noconfirm >/dev/null
-    pacman -Syw --noconfirm --cachedir "$OFFLINE" "${pkg_list[@]}" >/dev/null
-    mapfile -t pkgs < <(find "$OFFLINE" -maxdepth 1 -type f -name '*.pkg.tar.zst' | sort)
-    (( ${#pkgs[@]} > 0 )) || die "离线包为空"
-    repo-add "$OFFLINE/offline_repo.db.tar.gz" "${pkgs[@]}" >/dev/null
-    [ -e "$OFFLINE/offline_repo.db" ] || ln -s offline_repo.db.tar.gz "$OFFLINE/offline_repo.db"
+K="${KEEP_OFFLINE_IN_ISO:-0}"
+if [ "$K" = "1" ]; then OFF="$P/airootfs/opt/offline_repo"
+else OFF="$R/cachyos-archiso/offline_cache"; fi
+mkdir -p "$OFF"   # 372 行根因
+if [ "$K" = "1" ]; then
+  mapfile -t pl < <(awk 'NF && $1 !~ /^#/ {print $1}' "$P/packages_desktop.x86_64")
+  (( ${#pl[@]} > 0 )) || die "包清单为空"
+  grep -q '^\[cachyos\]' /etc/pacman.conf || printf '\n[cachyos]\nSigLevel = Never\nServer = https://mirror.cachyos.org/repo/x86_64/cachyos\n' >> /etc/pacman.conf
+  pacman -Syy --noconfirm >/dev/null
+  pacman -Syw --noconfirm --cachedir "$OFF" "${pl[@]}" >/dev/null
+  mapfile -t ps < <(find "$OFF" -maxdepth 1 -name '*.pkg.tar.zst' | sort)
+  (( ${#ps[@]} > 0 )) || die "离线包为空"
+  repo-add "$OFF/offline_repo.db.tar.gz" "${ps[@]}" >/dev/null
+  [ -e "$OFF/offline_repo.db" ] || ln -s offline_repo.db.tar.gz "$OFF/offline_repo.db"
 fi
 
-log "7 收尾配置"
+log "7 收尾"
 mkdir -p "$P/airootfs/etc/default"
 printf '%s\n' 'GRUB_DISABLE_OS_PROBER=false' >> "$P/airootfs/etc/default/grub"
 
 log "8 mkarchiso"
 cd cachyos-archiso
 chmod +x buildiso.sh
-BUILD_LOG="$(mktemp)"
+BL="$(mktemp)"
 if [ "${VERBOSE:-0}" = "1" ]; then
-    sudo -E ./buildiso.sh -p desktop || { cd ..; exit $?; }
+  sudo -E ./buildiso.sh -p desktop || { cd ..; exit $?; }
+elif sudo -E ./buildiso.sh -p desktop > "$BL" 2>&1; then
+  tail -n 12 "$BL"
 else
-    if sudo -E ./buildiso.sh -p desktop > "$BUILD_LOG" 2>&1; then
-        tail -n 12 "$BUILD_LOG"
-    else
-        rc=$?
-        printf '!! buildiso.sh 失败 (rc=%s)，回放日志：\n' "$rc" >&2
-        cat "$BUILD_LOG" >&2
-        rm -f "$BUILD_LOG"
-        exit "$rc"
-    fi
+  rc=$?; printf '!! buildiso.sh 失败 rc=%s\n' "$rc" >&2
+  cat "$BL" >&2; rm -f "$BL"; exit "$rc"
 fi
-rm -f "$BUILD_LOG"
+rm -f "$BL"
 cd ..
 
 log "9 收产物"
 rm -rf out && mkdir -p out
-mapfile -t isos < <(find "$ISO_SRC" -type f -name '*.iso' | sort)
+mapfile -t isos < <(find "$OUT" -type f -name '*.iso' | sort)
 (( ${#isos[@]} > 0 )) || die "没有 ISO"
 cp -- "${isos[@]}" out/
 cd out
 case "${COMPRESS:-zstd}" in
-    zstd) zstd -q -T0 -10 -- *.iso ;;
-    xz)   xz -q -9e -T2 -- *.iso ;;
-    none) : ;;
-    *)    die "COMPRESS 只支持 none/zstd/xz" ;;
+  zstd) zstd -q -T0 -10 -- *.iso ;;
+  xz)   xz -q -9e -T2 -- *.iso ;;
+  none) : ;;
+  *)    die "COMPRESS 只支持 none/zstd/xz" ;;
 esac
 ls -lh
-
 log "完成"
