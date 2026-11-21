@@ -91,9 +91,13 @@ mkdir -p "$OFF"   # 372 行根因
 if [ "$K" = "1" ]; then
   mapfile -t pl < <(awk 'NF && $1 !~ /^#/ {print $1}' "$P/packages_desktop.x86_64")
   (( ${#pl[@]} > 0 )) || die "包清单为空"
-  grep -q '^\[cachyos\]' /etc/pacman.conf || printf '\n[cachyos]\nSigLevel = Never\nServer = https://mirror.cachyos.org/repo/x86_64/cachyos\n' >> /etc/pacman.conf
-  pacman -Syy --noconfirm >/dev/null
-  pacman -Syw --noconfirm --cachedir "$OFF" "${pl[@]}" >/dev/null
+  # 宿主默认只有 Arch 官方仓库，cachyos-* 及桌面依赖链解析不全 → could not satisfy dependencies
+  # 直接用 clone 出来的官方完整配置（buildiso.sh 自己就用它）
+  cp "$P/pacman.conf" /etc/pacman.conf
+  [ -d "$P/airootfs/etc/pacman.d" ] && cp -r "$P/airootfs/etc/pacman.d/." /etc/pacman.d/ 2>/dev/null || true
+  sig /etc/pacman.conf
+  pacman -Syy --noconfirm >/dev/null || die "刷新仓库失败"
+  pacman -Syw --noconfirm --cachedir "$OFF" "${pl[@]}"
   mapfile -t ps < <(find "$OFF" -maxdepth 1 -name '*.pkg.tar.zst' | sort)
   (( ${#ps[@]} > 0 )) || die "离线包为空"
   repo-add "$OFF/offline_repo.db.tar.gz" "${ps[@]}" >/dev/null
