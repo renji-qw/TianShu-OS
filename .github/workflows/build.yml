@@ -19,17 +19,36 @@ jobs:
 
       - name: Split & Release
         run: |
-          set -euo pipefail
-          TAG="v1.0.2-stable"
+          set -eu
+          TAG=v1.0.2-stable
           REPO="${{ github.repository }}"
-
-          # Release 单资产上限 2G，取 1.99 GB（1990000000 B，两种 2G 口径都留余量）
-          # 阈值与切块同值：<=1.99G 直传，>1.99G 最多两片（覆盖到 3.98 GB）
           LIMIT=1990000000
-          find out -maxdepth 1 -name "*.iso.xz" -size "+${LIMIT}c" \
+
+          # Release 单资产上限 2G，取 1.99 GB；阈值与切块同值，最多两片
+          find out -maxdepth 1 -name '*.iso.xz' -size "+${LIMIT}c" \
             -exec split -b "$LIMIT" -d -a 2 {} {}.part- \; -exec rm -f {} \;
 
           cd out
-          shopt -s nullglob
-          files=(*)
-          ((${#files[@]})
+          ls -1 > /tmp/ts_files.txt
+          if ! test -s /tmp/ts_files.txt; then
+            echo '!! out/ 为空，没有产物可上传' >&2
+            exit 1
+          fi
+          cat /tmp/ts_files.txt
+
+          # gh release upload 不会自动建 Release，先确保它存在
+          if ! gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then
+            gh release create "$TAG" -R "$REPO" \
+              --target "${{ github.sha }}" \
+              --title "TianShu OS $TAG" \
+              --notes "Automated build from ${{ github.sha }}"
+          fi
+
+          while IFS= read -r f; do
+            gh release upload "$TAG" "$f" -R "$REPO" --clobber
+          done < /tmp/ts_files.txt
+
+          gh release view "$TAG" -R "$REPO"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
