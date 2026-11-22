@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# 只改本文件。configs/packages.x86_64 是唯一清单，直接由 pacstrap 装进 ISO。
-# env: COMPRESS=xz(默认)|none / EXTRA_PACKAGES / VERBOSE=1
-# 推送/切片由 build.yml 负责，本脚本只出 out/*.iso.xz
 set -euo pipefail
 
 R="$(cd "${WORKSPACE:-/work}" && pwd)"
@@ -26,7 +23,6 @@ log "0 环境"
 
 log "1 依赖"
 sig /etc/pacman.conf
-# archlinux:latest 的 mirrorlist 可能全注释；profile 的 [core]/[extra] 靠 Include 读它
 printf '%s\n' \
   'Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch' \
   'Server = https://mirrors.ustc.edu.cn/archlinux/$repo/os/$arch' \
@@ -60,7 +56,6 @@ for i in 1 2 3; do
     && break || { [ "$i" = 3 ] && die "clone 失败"; sleep 5; }
 done
 [ -f "$P/profiledef.sh" ] || die "clone 失败"
-# 上游仓库不带 cachyos-mirrorlist，prepare_profile 靠 curl 拉 GitHub raw，失败会写空文件
 mkdir -p "$P/airootfs/etc/pacman.d"
 printf '%s\n' 'Server = https://mirror.cachyos.org/repo/$arch/$repo' \
   > "$P/airootfs/etc/pacman.d/cachyos-mirrorlist"
@@ -85,17 +80,16 @@ for i, l in enumerate(ls):
         ])
 s = "\n".join(ls) + "\n"
 s = s.replace('    curl -sSL "${_mirrorlist_url}" > ${src_dir}/archiso/airootfs/etc/pacman.d/cachyos-mirrorlist',
-              '    : # mirrorlist 由 ci-build.sh 预置')
+              '    :')
 s = s.replace('        cp ${src_dir}/archiso/packages_desktop.x86_64 ${src_dir}/archiso/packages.x86_64',
-              '        : # packages.x86_64 由 ci-build.sh 直接写入')
+              '        :')
 s = s.replace('        ln -sf /usr/lib/systemd/system/plasmalogin.service ${src_dir}/archiso/airootfs/etc/systemd/system/display-manager.service',
-              '        : # 不建悬空 display-manager（清单里是 openbox）')
+              '        :')
 u.write_text(s)
 
-# 无 GPG key 时 sign_with_key 会读 /etc/makepkg.conf，在 buildiso.sh 的 ERR trap 下有风险
 sh = r/"util.sh"; t = sh.read_text()
 t = t.replace('sign_with_key() {\n',
-              'sign_with_key() {\n    return 0  # ci-build.sh: CI 无 GPG key，跳过签名\n', 1)
+              'sign_with_key() {\n    return 0\n', 1)
 sh.write_text(t)
 
 p = r/"archiso/profiledef.sh"; d = p.read_text()
@@ -104,17 +98,16 @@ for k, v in {'iso_name':'tianshu','iso_label':'TS_OS','iso_publisher':'TS OS',
     d = re.sub(r'^'+k+r'=.*$', k+'="'+v+'"', d, count=1, flags=re.M)
 p.write_text(d)
 
-# 清单里只有 linux-cachyos，上游 preset 与引导项全指向不存在的 lts 内核 →
-# mkinitcpio 生成 initramfs 必挂。统一改指主内核。
 paths = [r/"archiso/airootfs/etc/mkinitcpio.d/linux.preset",
          r/"archiso/grub/grub.cfg", r/"archiso/grub/loopback.cfg"]
 paths += sorted((r/"archiso/syslinux").glob("*.cfg"))
 paths += sorted((r/"archiso/efiboot/loader/entries").glob("*.conf"))
 for f in paths:
     if f.exists():
-        f.write_text(f.read_text().replace("linux-cachyos-lts", "linux-cachyos"))
+        t = f.read_text().replace("linux-cachyos-lts", "linux-cachyos")
+        t = t.replace("archisosearchuuid=%ARCHISO_UUID%", "archisolabel=%ARCHISO_LABEL%")
+        f.write_text(t)
 PY
-# file_permissions 里唯一上游缺失的文件，补空占位避免 archiso 版本变严时报错
 : > "$P/airootfs/usr/local/bin/nvidia-module-loader"
 chmod 755 "$P/airootfs/usr/local/bin/nvidia-module-loader"
 bash -n cachyos-archiso/util-iso.sh cachyos-archiso/util.sh "$P/profiledef.sh" || die "patch 后语法错"
@@ -124,10 +117,9 @@ grep -q 'vmlinuz-linux-cachyos' "$P/airootfs/etc/mkinitcpio.d/linux.preset" || d
 ! grep -rq 'linux-cachyos-lts' "$P/airootfs/etc/mkinitcpio.d" "$P/grub" "$P/syslinux" "$P/efiboot" || die "lts 残留"
 
 log "5 注入"
-# 文件名就是 configs/packages.x86_64 → $P/packages.x86_64（上游 cp 已在第 4 步短路）
 install -Dm644 configs/packages.x86_64 "$P/packages.x86_64"
+printf '%s\n' mkinitcpio mkinitcpio-archiso mkinitcpio-nfs-utils >> "$P/packages.x86_64"
 if [ -n "${EXTRA_PACKAGES:-}" ]; then
-  # shellcheck disable=SC2086
   printf '%s\n' $EXTRA_PACKAGES >> "$P/packages.x86_64"
 fi
 install -Dm755 scripts/customize_airootfs.sh "$P/airootfs/root/customize_airootfs.sh"
