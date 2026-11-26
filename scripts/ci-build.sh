@@ -71,11 +71,13 @@ if ! apt-cache show live-build >/dev/null 2>&1; then
 fi
 # live-build + 构建工具链 + 开机动画 + logo 生成（PIL/CJK 字体）
 # 说明：apt 的 rustc 一概不用，core 走 rustup。
+# libc6-dev 必须显式装：trixie 的 gcc 不硬依赖它，而宿主 build script 链接
+# 需要它提供的 crt 对象（Scrt1.o/crti.o/crtn.o）与 libc.so 桩。
 apt-get install -y --no-install-recommends \
     live-build debootstrap squashfs-tools xorriso grub2-common grub-efi-amd64-bin \
     mtools dosfstools plymouth plymouth-themes \
     python3 python3-pil python3-fonttools fonts-noto-cjk \
-    gcc musl-tools ca-certificates curl xz-utils
+    gcc libc6-dev musl-tools ca-certificates curl xz-utils
 
 # ---------------------------------------------------------------- 2 core（rustup + RsProxy）
 log "2 core（rustup + RsProxy → x86_64-unknown-linux-musl）"
