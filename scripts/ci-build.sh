@@ -86,16 +86,26 @@ export RUSTUP_UPDATE_ROOT="https://rsproxy.cn/rustup"
 if ! command -v rustup >/dev/null 2>&1 && [ ! -x /root/.cargo/bin/rustup ]; then
     curl --proto '=https' --tlsv1.2 -sSf https://rsproxy.cn/rustup-init.sh -o /tmp/rustup-init.sh \
         || curl -sSf https://sh.rustup.rs -o /tmp/rustup-init.sh
-    sh /tmp/rustup-init.sh -y --no-modify-path --profile minimal --default-toolchain stable
+    # 只装 rustup 本体；工具链交给下面带回落的 install_toolchain，
+    # 避免 init 阶段 RsProxy 被跨境链路重置时整个构建暴毙
+    sh /tmp/rustup-init.sh -y --no-modify-path --profile minimal --default-toolchain none
 fi
 export PATH="/root/.cargo/bin:${PATH}"
-# RsProxy 跨境链路可能被 TLS 干扰；工具链装不上则回落官方源（仍走 rustup，不用 apt 的 rustc）
-if ! rustup default stable || ! rustup target add x86_64-unknown-linux-musl; then
+install_toolchain() {
+    rustup default stable && rustup target add x86_64-unknown-linux-musl
+}
+# RsProxy 跨境链路可能被 TLS 干扰/连接重置：先重试，仍不行回落官方源（仍走 rustup，不用 apt 的 rustc）
+ok=0
+for try in 1 2 3; do
+    if install_toolchain; then ok=1; break; fi
+    warn "rustup 工具链安装失败（第 ${try} 次）"
+    sleep 5
+done
+if [ "$ok" != 1 ]; then
     warn "RsProxy 不可用，rustup 回落官方源"
     export RUSTUP_DIST_SERVER="https://static.rust-lang.org"
     export RUSTUP_UPDATE_ROOT="https://static.rust-lang.org/rustup"
-    rustup default stable
-    rustup target add x86_64-unknown-linux-musl
+    install_toolchain || die "rustup 工具链安装失败（官方源也不可用）"
 fi
 if ! (cd core && RUSTFLAGS="-C target-cpu=x86-64" cargo build --release --target x86_64-unknown-linux-musl); then
     # musl 链接器兜底（部分环境需要显式 musl-gcc）
