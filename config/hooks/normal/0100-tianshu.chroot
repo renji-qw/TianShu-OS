@@ -45,6 +45,22 @@ BUG_REPORT_URL="https://github.com/renji-qw/TianShu-OS/issues"
 EOF
 [ -e /usr/lib/os-release ] && cp /etc/os-release /usr/lib/os-release 2>/dev/null || true
 
+# ---------------------------------------------------------------- 内核早期 fallback（无 KMS）
+# 构建期若生成了 tianshu-logo.ppm（16×16 单色），登录横幅用其衍生图形；
+# 否则退文字模式。放在 tty1 自启之前刷新 /etc/issue。
+say "控制台 fallback：帧缓冲标识"
+mkdir -p /usr/share/tianshu
+if [ -f /usr/share/tianshu/issue.banner ]; then
+    {
+        cat /usr/share/tianshu/issue.banner
+        printf '\n天枢 OS \\s \\r \\m\n\n'
+    } > /etc/issue
+else
+    printf '天枢 OS \\s \\r \\m\n\n' > /etc/issue
+fi
+# 横幅用完即焚，不占 squashfs；ppm 保留（16×16，KB 级）
+rm -f /usr/share/tianshu/issue.banner
+
 # ---------------------------------------------------------------- tty1 自启（仅 Live 环境）
 say "tty1 自动登录（仅 Live 环境）"
 mkdir -p /etc/systemd/system/getty@tty1.service.d

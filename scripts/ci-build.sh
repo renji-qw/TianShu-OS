@@ -281,6 +281,47 @@ def subset_font(dest):
         shutil.copy(src, dest)
         return src
 
+# ---- 内核早期 fallback（无 KMS）：16×16 单色 PPM + 帧缓冲控制台横幅 ----
+# tianshu-logo.ppm 为纯黑白 P3；有则登录横幅用其衍生图形，无则退文字模式。
+tsd = os.path.join(STAGE, "usr/share/tianshu")
+os.makedirs(tsd, exist_ok=True)
+N = 16
+grid = [[0] * N for _ in range(N)]
+mono = Image.new("L", (N, N), 0)
+md = ImageDraw.Draw(mono)
+md.rectangle([0, 0, N - 1, N - 1], outline=255)
+font16, _ = load_font(7)
+if font16 is not None:
+    for i, ch in enumerate("天枢"):
+        bb = md.textbbox((0, 0), ch, font=font16)
+        gw, gh = bb[2] - bb[0], bb[3] - bb[1]
+        md.text(((N - gw) / 2 - bb[0], 1 + i * 7 - bb[1]), ch, font=font16, fill=255)
+else:
+    # 方印几何兜底（不含任何拉丁字母）
+    md.line([3, 4, 12, 4], fill=255)
+    md.line([3, 6, 12, 6], fill=255)
+    md.line([7, 2, 7, 13], fill=255)
+    md.line([3, 10, 12, 10], fill=255)
+    md.point([(4, 12), (5, 12), (10, 12), (11, 12)], fill=255)
+mp = mono.load()
+for y in range(N):
+    for x in range(N):
+        grid[y][x] = 1 if mp[x, y] >= 128 else 0
+with open(os.path.join(tsd, "tianshu-logo.ppm"), "w", encoding="ascii") as f:
+    f.write("P3\n%d %d\n255\n" % (N, N))
+    for y in range(N):
+        f.write(" ".join("255 255 255" if grid[y][x] else "0 0 0" for x in range(N)) + "\n")
+# 登录横幅由同一 16×16 位图衍生（半块字符，纯文本，帧缓冲控制台可见）
+rows = []
+for y in range(0, N, 2):
+    row = ""
+    for x in range(N):
+        t, b = grid[y][x], grid[y + 1][x]
+        row += "█" if (t and b) else "▀" if t else "▄" if b else " "
+    rows.append(row)
+with open(os.path.join(tsd, "issue.banner"), "w", encoding="utf-8") as f:
+    f.write("\n".join(rows) + "\n")
+
 font_src = subset_font(os.path.join(ply, "tianshu-cjk.ttf"))
 print("[TianShu] 标识字体：%s" % (font_src if font_src else "未找到（退化为几何方印）"))
 PY
@@ -306,6 +347,7 @@ build_edition() {
         --iso-application "TianShu OS" \
         --iso-publisher "Zishu Alliance" \
         --iso-volume "TIANSHU_OS" \
+        --image-name "tianshu-$ed-$VER" \
         --bootappend-live "boot=live components quiet splash username=tianshu hostname=tianshu locales=zh_CN.UTF-8 timezone=Asia/Shanghai" \
         --mirror-bootstrap "${MIRROR}/" \
         --mirror-chroot "${MIRROR}/" \
@@ -368,7 +410,8 @@ build_edition() {
 
     log "4 [$label] 收产物"
     local iso
-    iso="$(find "$LIVE/binary" -maxdepth 1 -type f -name '*.iso' 2>/dev/null | sort | head -1)"
+    # 产物落 live-build 工作区根：tianshu-<ed>-<ver>-amd64.hybrid.iso
+    iso="$(find "$LIVE" -maxdepth 1 -type f \( -name '*.iso' -o -name '*.hybrid.iso' \) 2>/dev/null | sort | head -1)"
     [ -n "$iso" ] || die "没有 ISO 产出（$label）"
     cp -f "$iso" "$OUT/tianshu-$ed-$VER.iso"
     rm -f "$iso"
