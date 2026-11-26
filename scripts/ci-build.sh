@@ -22,6 +22,7 @@ VER="2.0.0-debian-alpha"
 CORE=""
 
 log(){ printf '==> %s\n' "$*"; }
+warn(){ printf '!! %s\n' "$*" >&2; }
 die(){ printf '!! %s\n' "$*" >&2; exit 1; }
 
 export TZ=UTC USER="${USER:-root}"
@@ -42,15 +43,32 @@ done
 
 # ---------------------------------------------------------------- 1 依赖（apt 源走 USTC）
 log "1 依赖（apt 源 → USTC）"
-for f in /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
-    [ -f "$f" ] || continue
-    sed -i -E \
-        -e 's|https?://deb\.debian\.org/debian-security|https://mirrors.ustc.edu.cn/debian-security|g' \
-        -e 's|https?://security\.debian\.org/debian-security|https://mirrors.ustc.edu.cn/debian-security|g' \
-        -e 's|https?://deb\.debian\.org/debian|https://mirrors.ustc.edu.cn/debian|g' \
-        -e 's|https?://security\.debian\.org/debian|https://mirrors.ustc.edu.cn/debian|g' "$f"
-done
-apt-get update -qq
+# 注：海外跑机到 USTC 的 TLS 链路常被干扰（证书校验失败），apt 仓完整性由
+# InRelease 的 GPG 签名保证，故源走 http；USTC 取不到索引时回落 deb.debian.org。
+set_apt_sources() { # $1=debian 源  $2=security 源
+    local f
+    for f in /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
+        [ -f "$f" ] || continue
+        sed -i -E \
+            -e "s|https?://deb\\.debian\\.org/debian-security|$2|g" \
+            -e "s|https?://security\\.debian\\.org/debian-security|$2|g" \
+            -e "s|https?://mirrors\\.ustc\\.edu\\.cn/debian-security|$2|g" \
+            -e "s|https?://deb\\.debian\\.org/debian|$1|g" \
+            -e "s|https?://security\\.debian\\.org/debian|$1|g" \
+            -e "s|https?://mirrors\\.ustc\\.edu\\.cn/debian|$1|g" "$f"
+    done
+}
+MIRROR="http://mirrors.ustc.edu.cn/debian"
+MIRROR_SEC="http://mirrors.ustc.edu.cn/debian-security"
+set_apt_sources "$MIRROR" "$MIRROR_SEC"
+apt-get update -qq || true
+if ! apt-cache show live-build >/dev/null 2>&1; then
+    warn "USTC 源取不到索引，回落 deb.debian.org"
+    MIRROR="http://deb.debian.org/debian"
+    MIRROR_SEC="http://deb.debian.org/debian-security"
+    set_apt_sources "$MIRROR" "$MIRROR_SEC"
+    apt-get update -qq || die "apt 源均不可用"
+fi
 # live-build + 构建工具链 + 开机动画 + logo 生成（PIL/CJK 字体）
 # 说明：apt 的 rustc 一概不用，core 走 rustup。
 apt-get install -y --no-install-recommends \
@@ -69,8 +87,14 @@ if ! command -v rustup >/dev/null 2>&1 && [ ! -x /root/.cargo/bin/rustup ]; then
     sh /tmp/rustup-init.sh -y --no-modify-path --profile minimal --default-toolchain stable
 fi
 export PATH="/root/.cargo/bin:${PATH}"
-rustup default stable
-rustup target add x86_64-unknown-linux-musl
+# RsProxy 跨境链路可能被 TLS 干扰；工具链装不上则回落官方源（仍走 rustup，不用 apt 的 rustc）
+if ! rustup default stable || ! rustup target add x86_64-unknown-linux-musl; then
+    warn "RsProxy 不可用，rustup 回落官方源"
+    export RUSTUP_DIST_SERVER="https://static.rust-lang.org"
+    export RUSTUP_UPDATE_ROOT="https://static.rust-lang.org/rustup"
+    rustup default stable
+    rustup target add x86_64-unknown-linux-musl
+fi
 if ! (cd core && RUSTFLAGS="-C target-cpu=x86-64" cargo build --release --target x86_64-unknown-linux-musl); then
     # musl 链接器兜底（部分环境需要显式 musl-gcc）
     (cd core && CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc \
@@ -283,11 +307,11 @@ build_edition() {
         --iso-publisher "Zishu Alliance" \
         --iso-volume "TIANSHU_OS" \
         --bootappend-live "boot=live components quiet splash username=tianshu hostname=tianshu locales=zh_CN.UTF-8 timezone=Asia/Shanghai" \
-        --mirror-bootstrap "https://mirrors.ustc.edu.cn/debian/" \
-        --mirror-chroot "https://mirrors.ustc.edu.cn/debian/" \
-        --mirror-chroot-security "https://mirrors.ustc.edu.cn/debian-security/" \
-        --mirror-binary "https://mirrors.ustc.edu.cn/debian/" \
-        --mirror-binary-security "https://mirrors.ustc.edu.cn/debian-security/"
+        --mirror-bootstrap "${MIRROR}/" \
+        --mirror-chroot "${MIRROR}/" \
+        --mirror-chroot-security "${MIRROR_SEC}/" \
+        --mirror-binary "${MIRROR}/" \
+        --mirror-binary-security "${MIRROR_SEC}/"
 
     log "4 [$label] 放 package-lists / hooks / 白牌资源"
     mkdir -p config/package-lists config/hooks/normal config/bootloaders
