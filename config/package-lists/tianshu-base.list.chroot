@@ -10,8 +10,9 @@ plymouth-themes
 calamares
 btrfs-progs
 snapper
-grub-efi-amd64
-grub-pc
+grub-efi-amd64-bin
+grub-pc-bin
+grub2-common
 os-prober
 linux-image-amd64
 firmware-linux
