@@ -1,0 +1,214 @@
+# 天枢 OS —— 开机动画（三阶紫罗兰 · script 模块实时绘制）
+# 唯一标识：汉字「天枢」竖排；全篇无英文、无拉丁字样、无上游图标。
+#
+# 时间线：
+#   0–2s       「天枢」二字透明度 0 → 1 淡入
+#   2s 之后    1.00 ↔ 1.03 正弦呼吸缩放，如墨迹微漾
+#   过程中     底部进度圆点随 systemd 阶段逐个点亮
+#   需要口令   淡出二字，浮现密码框
+#   收尾       整体淡出，交接显示管理器，不闪屏
+# 背景：#E2D0E8 → #D8D1E6 → #CEC5DB 三阶紫罗兰缓慢往复。
+
+# ---------------- 状态 ----------------
+global.frames = 0;
+global.fade = 0.0;
+global.lit = 0;
+global.done = 0;
+global.status = "normal";
+global.angle = 0.0;
+global.breath = 0.0;
+global.scale_applied = 0.0;
+
+# ---------------- 资源 ----------------
+global.dot_on = Image("progress_dot_on.png");
+global.dot_off = Image("progress_dot_off.png");
+global.pw_img = Image("password_field.png");
+
+# 「天枢」二字：实时文本渲染（系统 CJK 字体，见 initramfs 钩子 tianshu-plymouth-font）
+global.glyph_t = Image.Text("天", 0.165, 0.141, 0.220);
+global.glyph_s = Image.Text("枢", 0.165, 0.141, 0.220);
+
+global.sprite_t = Sprite(global.glyph_t);
+global.sprite_s = Sprite(global.glyph_s);
+global.sprite_t.SetOpacity(0);
+global.sprite_s.SetOpacity(0);
+
+global.pw_sprite = Sprite(global.pw_img);
+global.pw_sprite.SetOpacity(0);
+
+# ---------------- 底部进度圆点 ----------------
+for (index = 0; index < 8; index++)
+  {
+    global.dots[index] = Sprite(global.dot_off);
+    global.dots[index].SetOpacity(0.5);
+  }
+
+# ---------------- 背景：三阶紫罗兰 ----------------
+fun set_background()
+  {
+    t = global.breath;
+    top_r = 226.0 - (226.0 - 216.0) * t;
+    top_g = 208.0 - (208.0 - 209.0) * t;
+    top_b = 232.0 - (232.0 - 230.0) * t;
+    bot_r = 216.0 - (216.0 - 206.0) * t;
+    bot_g = 209.0 - (209.0 - 197.0) * t;
+    bot_b = 230.0 - (230.0 - 219.0) * t;
+    Window.SetBackgroundTopColor(top_r / 255.0, top_g / 255.0, top_b / 255.0);
+    Window.SetBackgroundBottomColor(bot_r / 255.0, bot_g / 255.0, bot_b / 255.0);
+  }
+
+# ---------------- 版面 ----------------
+fun place_logos(scale)
+  {
+    w = Math.Int(global.glyph_t.GetWidth() * scale);
+    h = Math.Int(global.glyph_t.GetHeight() * scale);
+    if (w < 1)
+      {
+        w = 1;
+      }
+    if (h < 1)
+      {
+        h = 1;
+      }
+    global.sprite_t.SetImage(global.glyph_t.Scale(w, h));
+    global.sprite_s.SetImage(global.glyph_s.Scale(w, h));
+
+    cx = Window.GetWidth() / 2;
+    cy = Window.GetHeight() / 2 - 30;
+
+    global.sprite_t.SetX(cx - w / 2);
+    global.sprite_t.SetY(cy - h - 8);
+    global.sprite_s.SetX(cx - w / 2);
+    global.sprite_s.SetY(cy + 8);
+
+    global.pw_sprite.SetX(cx - global.pw_img.GetWidth() / 2);
+    global.pw_sprite.SetY(Window.GetHeight() / 2 + 96);
+  }
+
+fun place_dots()
+  {
+    x0 = Window.GetWidth() / 2 - (8 * 34) / 2 + 17;
+    y = Window.GetHeight() - 72;
+    for (index = 0; index < 8; index++)
+      {
+        global.dots[index].SetX(x0 + index * 34);
+        global.dots[index].SetY(y);
+      }
+  }
+
+# ---------------- 主循环 ----------------
+fun refresh_callback()
+  {
+    global.frames = global.frames + 1;
+
+    # 呼吸相位：0.5 Hz 正弦
+    global.angle = global.angle + ((2 * 3.14) / 50) * 0.5;
+    wave = (Math.Cos(global.angle) + 1) / 2;
+    global.breath = wave;
+
+    set_background();
+    place_dots();
+
+    # 淡入：前 100 帧（0–2s）线性，之后保持
+    if (global.frames < 100)
+      {
+        global.fade = global.frames / 100.0;
+      }
+    else
+      {
+        global.fade = 1.0;
+      }
+
+    # 呼吸缩放：2s 之后 1.00 ↔ 1.03
+    scale = 1.0;
+    if (global.frames >= 100)
+      {
+        scale = 1.0 + 0.03 * wave;
+      }
+    scale_q = Math.Int(scale * 1000.0) / 1000.0;
+    if (scale_q != global.scale_applied)
+      {
+        global.scale_applied = scale_q;
+        place_logos(scale_q);
+      }
+
+    # 透明度：淡入 × 状态（口令界面压暗）
+    if (global.status == "password")
+      {
+        op = global.fade * 0.15;
+      }
+    else
+      {
+        op = global.fade;
+      }
+
+    # 收尾整体淡出，交接显示管理器
+    if (global.done == 1)
+      {
+        op = op * 0.90;
+      }
+
+    global.sprite_t.SetOpacity(op);
+    global.sprite_s.SetOpacity(op);
+
+    # 进度圆点：随 systemd 阶段逐个点亮
+    for (index = 0; index < 8; index++)
+      {
+        if (index < global.lit)
+          {
+            global.dots[index].SetImage(global.dot_on);
+            global.dots[index].SetOpacity(1);
+          }
+        else
+          {
+            global.dots[index].SetImage(global.dot_off);
+            global.dots[index].SetOpacity(0.5);
+          }
+      }
+  }
+
+Plymouth.SetRefreshFunction(refresh_callback);
+
+# ---------------- 进度 ----------------
+fun progress_callback(duration, progress)
+  {
+    global.progress = progress;
+    global.lit = Math.Int(progress * 8);
+    if (global.lit > 8)
+      {
+        global.lit = 8;
+      }
+    if (progress >= 1.0)
+      {
+        global.done = 1;
+      }
+  }
+
+Plymouth.SetBootProgressFunction(progress_callback);
+
+# ---------------- 口令 ----------------
+fun display_normal_callback()
+  {
+    global.status = "normal";
+    global.pw_sprite.SetOpacity(0);
+  }
+
+Plymouth.SetDisplayNormalFunction(display_normal_callback);
+
+fun display_password_callback(prompt, bullets)
+  {
+    global.status = "password";
+    global.pw_sprite.SetOpacity(1);
+  }
+
+Plymouth.SetDisplayPasswordFunction(display_password_callback);
+
+# ---------------- 退场 ----------------
+fun quit_callback()
+  {
+    global.sprite_t.SetOpacity(0);
+    global.sprite_s.SetOpacity(0);
+    global.pw_sprite.SetOpacity(0);
+  }
+
+Plymouth.SetQuitFunction(quit_callback);

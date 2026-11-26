@@ -1,0 +1,39 @@
+# 天枢 OS — 底座包清单（Debian trixie / live-build）
+# 说明：
+#   * live-boot / live-config / systemd-sysv 由 live-build 自动加入，此处显式列出 systemd-sysv 以示底座。
+#   * libssl 在 trixie 的真实包名为 libssl3t64（Provides: libssl3）。
+#   * 不安装 apt 的 rustc —— core 一律走 rustup + RsProxy 静态编译。
+live-boot
+systemd-sysv
+plymouth
+plymouth-themes
+calamares
+btrfs-progs
+snapper
+grub-efi-amd64
+grub-pc
+os-prober
+linux-image-amd64
+firmware-linux
+firmware-misc-nonfree
+xserver-xorg
+xinit
+openbox
+xterm
+ibus
+ibus-pinyin
+ibus-gtk
+ibus-gtk3
+network-manager
+wpasupplicant
+sudo
+polkit
+zram-tools
+mesa-vulkan-drivers
+fonts-noto-cjk
+libc6
+libssl3t64
+ca-certificates
+locales
+console-setup
+keyboard-configuration

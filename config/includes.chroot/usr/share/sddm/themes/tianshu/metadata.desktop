@@ -1,0 +1,13 @@
+[SddmGreeterTheme]
+Name=天枢
+Description=天枢 OS · 三阶紫罗兰
+Author=紫枢联合组织
+Copyright=AGPL-3.0-only
+License=AGPL-3.0-only
+Type=sddm-theme
+Version=1.0
+Website=https://github.com/renji-qw/TianShu-OS
+MainScript=Main.qml
+ConfigFile=theme.conf
+Theme-Id=tianshu
+Theme-API=

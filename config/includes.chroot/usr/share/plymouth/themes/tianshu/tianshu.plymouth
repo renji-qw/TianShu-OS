@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=天枢
+Description=天枢 OS 开机动画（三阶紫罗兰，实时绘制）
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/tianshu
+ScriptFile=/usr/share/plymouth/themes/tianshu/tianshu.script

@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=安装天枢 OS
+Name[zh_CN]=安装天枢 OS
+Comment=将天枢 OS 安装到本机磁盘
+Comment[zh_CN]=将天枢 OS 安装到本机磁盘
+Exec=sudo -E calamares
+Icon=tianshu-logo
+Terminal=false
+Categories=System;
+Keywords=天枢;安装;
+StartupNotify=true

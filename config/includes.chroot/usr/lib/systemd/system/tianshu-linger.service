@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 紫枢联合组织 / TianShu OS Project
+#
+# 天枢 OS — 为首个普通用户开启 linger：
+#   systemd --user 在用户首次登录时启动；开启 linger 后，用户未登录时实例也能存活。
+#   安装器建用户后同样适用（安装后首次开机即生效）。
+[Unit]
+Description=TianShu Linger Enabler
+After=multi-user.target
+ConditionPathExists=/home
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c 'for d in /home/*; do u=$(basename "$d"); id "$u" >/dev/null 2>&1 || continue; loginctl enable-linger "$u" 2>/dev/null && break; done'
+
+[Install]
+WantedBy=multi-user.target

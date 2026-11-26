@@ -1,0 +1,126 @@
+#!/bin/bash
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 紫枢联合组织 / TianShu OS Project
+#
+# 天枢 OS — memguard：2G 硬开关 + 轻量版内存看门狗
+#
+#   session  （用户态，随 tianshu.service 的 ExecStartPost 触发）
+#       MemTotal ≤ 2G 时：关合成器 / 关动画 / 关毛玻璃（毛玻璃让位）
+#   watchdog （root，systemd 单元 tianshu-memguard.service）
+#       仅轻量版默认开启（/etc/tianshu/memguard.conf 中 ENABLED=1）：
+#       可用内存跌破阈值时逐步回收 —— 先清页缓存，再清最耗内存的非关键进程。
+#
+# 阈值判定只写在这里，绝不写死在 systemd 单元里。
+set -uo pipefail
+
+CONF=/etc/tianshu/memguard.conf
+LOW_MEM_KB=$((2 * 1024 * 1024))     # 2G
+DEFAULT_THRESHOLD_MB=256
+INTERVAL=15
+
+load_conf() {
+    # shellcheck disable=SC1090
+    [ -f "$CONF" ] && . "$CONF"
+    ENABLED="${ENABLED:-0}"
+    THRESHOLD_MB="${THRESHOLD_MB:-$DEFAULT_THRESHOLD_MB}"
+    INTERVAL="${INTERVAL:-$INTERVAL}"
+}
+
+memtotal_kb() { awk '/^MemTotal:/ {print $2; exit}' /proc/meminfo 2>/dev/null || echo 0; }
+memavail_mb() { awk '/^MemAvailable:/ {printf "%d", $2/1024; exit}' /proc/meminfo 2>/dev/null || echo 0; }
+
+low_memory() {
+    local total
+    total="$(memtotal_kb)"
+    [ "$total" -gt 0 ] || return 1
+    [ "$total" -le "$LOW_MEM_KB" ]
+}
+
+# ---------------------------------------------------------------- 会话态（用户）
+session_mode() {
+    if ! low_memory; then
+        # >2G：全毛玻璃，不做任何干预
+        printf '[TianShu][memguard] 内存充裕（%s kB），合成器与动画保持开启\n' "$(memtotal_kb)"
+        return 0
+    fi
+    printf '[TianShu][memguard] MemTotal ≤ 2G，关闭合成器/动画，毛玻璃让位\n'
+
+    # KDE Plasma 6 / 5
+    if command -v kwriteconfig6 >/dev/null 2>&1; then
+        kwriteconfig6 --file kwinrc --group Compositing --key Enabled false 2>/dev/null
+        kwriteconfig6 --file kwinrc --group Compositing --key AnimationSpeed 0 2>/dev/null
+        kwriteconfig6 --file kwinrc --group Effect-blur --key Enabled false 2>/dev/null
+        kwriteconfig6 --file kdeglobals --group KDE --key AnimationSpeed 0 2>/dev/null
+        kwriteconfig6 --file kdeglobals --group KDE --key AnimationDurationFactor 0.0 2>/dev/null
+    elif command -v kwriteconfig5 >/dev/null 2>&1; then
+        kwriteconfig5 --file kwinrc --group Compositing --key Enabled false 2>/dev/null
+        kwriteconfig5 --file kwinrc --group Compositing --key AnimationSpeed 0 2>/dev/null
+        kwriteconfig5 --file kwinrc --group Effect-blur --key Enabled false 2>/dev/null
+        kwriteconfig5 --file kdeglobals --group KDE --key AnimationSpeed 0 2>/dev/null
+    fi
+
+    # 立即生效（X11 会话）：挂起合成器并让 kwin 重新读取配置
+    if command -v qdbus6 >/dev/null 2>&1; then
+        qdbus6 org.kde.KWin /Compositor org.kde.kwin.Compositor.suspend >/dev/null 2>&1
+        qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1
+    elif command -v qdbus >/dev/null 2>&1; then
+        qdbus org.kde.KWin /Compositor org.kde.kwin.Compositor.suspend >/dev/null 2>&1
+        qdbus org.kde.KWin /KWin reconfigure >/dev/null 2>&1
+    fi
+
+    # Xfce：关 xfwm4 合成器（毛玻璃随之让位）
+    if command -v xfconf-query >/dev/null 2>&1; then
+        xfconf-query -c xfwm4 -p /general/use_compositing -s false 2>/dev/null
+        xfconf-query -c xsettings -p /Net/EnableEventSounds -s false 2>/dev/null
+    fi
+
+    # zram：zram-tools 默认配置已在开机时启用；这里再兜底确认一次
+    systemctl is-active --quiet zramswap.service 2>/dev/null || \
+        systemctl start zramswap.service 2>/dev/null || true
+
+    printf '[TianShu][memguard] 低内存模式已生效\n'
+}
+
+# ---------------------------------------------------------------- 看门狗（root）
+watchdog_mode() {
+    load_conf
+    if [ "$ENABLED" != "1" ]; then
+        printf '[TianShu][memguard] 看门狗未启用（ENABLED=%s），退出\n' "$ENABLED"
+        return 0
+    fi
+    printf '[TianShu][memguard] 看门狗启动，阈值 %s MB\n' "$THRESHOLD_MB"
+    while :; do
+        avail="$(memavail_mb)"
+        if [ "$avail" -lt "$THRESHOLD_MB" ]; then
+            printf '[TianShu][memguard] 可用内存 %s MB 低于阈值，开始回收\n' "$avail"
+            # 1) 先归还页缓存（内核会保留可回收部分）
+            sync 2>/dev/null || true
+            echo 3 > /proc/sys/vm/drop_caches 2>/dev/null || true
+            # 2) 再清理最占内存的非关键进程（保留桌面/核心/系统）
+            victim=""
+            for pid in $(ps -eo pid=,rss=,comm= --sort=-rss 2>/dev/null | awk 'NR>1{print $1" "$3}' | head -n 25); do
+                p="${pid%% *}"
+                c="${pid##* }"
+                case "$c" in
+                    systemd|systemd-journald|kthreadd|Xorg|X|kwin|plasmashell|xfce4-session|xfwm4|lightdm|sddm|NetworkManager|dbus-daemon|systemd-userdbd|systemd-logind|systemd|agetty|tianshu_core|sshd|sudo|polkitd|login)
+                        continue ;;
+                esac
+                [ -d "/proc/$p" ] || continue
+                victim="$p"
+                break
+            done
+            if [ -n "$victim" ]; then
+                printf '[TianShu][memguard] 回收进程 %s\n' "$victim"
+                kill -TERM "$victim" 2>/dev/null || true
+            fi
+        fi
+        sleep "$INTERVAL"
+    done
+}
+
+case "${1:-session}" in
+    session)  session_mode ;;
+    watchdog) watchdog_mode ;;
+    *)        session_mode ;;
+esac
+exit 0

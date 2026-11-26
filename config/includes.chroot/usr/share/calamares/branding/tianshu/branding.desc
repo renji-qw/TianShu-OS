@@ -1,0 +1,21 @@
+componentName: tianshu
+welcomeStyleBool: true
+welcomeExpandingLogo: true
+windowExpanding: "normal"
+strings:
+    productName: 天枢 OS
+    shortProductName: 天枢
+    version: 1.0
+    shortVersion: 1.0
+    releaseType: Beta
+    shortReleaseType: Beta
+    bootloader: GRUB2
+    productUrl: https://github.com/renji-qw/TianShu-OS
+    supportUrl: https://github.com/renji-qw/TianShu-OS/issues
+    knownIssuesUrl: https://github.com/renji-qw/TianShu-OS/issues
+    releaseNotesUrl: https://github.com/renji-qw/TianShu-OS/releases
+images:
+    productLogo: "logo.png"
+    productIcon: "logo.png"
+    productUrl: "logo.png"
+slideshow: "show.qml"

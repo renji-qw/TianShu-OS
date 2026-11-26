@@ -4,15 +4,15 @@ permissions: { contents: write }
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
 
       - name: Fix CRLF
-        run: sed -i 's/\r$//' scripts/*.sh
+        run: sed -i 's/\r$//' scripts/*.sh config/hooks/normal/* 2>/dev/null || true
 
       - name: Build
-        run: docker run --rm --privileged -v "$PWD":/work -w /work archlinux:latest bash /work/scripts/ci-build.sh
+        run: docker run --rm --privileged -v "$PWD":/work -w /work debian:trixie bash /work/scripts/ci-build.sh
 
       - name: Fix Perms
         run: sudo chown -R "$(id -u):$(id -g)" out/
@@ -20,7 +20,7 @@ jobs:
       - name: Split & Release
         run: |
           set -eu
-          TAG=v1.0.2-stable
+          TAG=v2.0.0-debian-alpha
           REPO="${{ github.repository }}"
           LIMIT=1990000000
 

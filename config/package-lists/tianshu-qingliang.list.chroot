@@ -1,0 +1,6 @@
+# 天枢 OS — 轻量版（Xfce）追加包
+# 默认开启 memguard（内存看门狗），开关见 /etc/tianshu/memguard.conf
+xfce4
+xfce4-goodies
+lightdm
+lightdm-gtk-greeter

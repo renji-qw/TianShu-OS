@@ -1,0 +1,122 @@
+#!/bin/bash
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 紫枢联合组织 / TianShu OS Project
+#
+# 天枢 OS — chroot 定制 hook（取代旧 Arch 版 scripts/customize_airootfs.sh）
+# 由 live-build 在 chroot 阶段以 root 执行；此处只做「口径」与「白牌」，
+# 任何非关键失败都不应中断整个 ISO 构建。
+set -uo pipefail
+
+say()  { printf '[TianShu] %s\n' "$*"; }
+warn() { printf '[TianShu][warn] %s\n' "$*" >&2; }
+
+# ---------------------------------------------------------------- 清理缓存
+say "清理文档与缓存（压缩 squashfs 体积）"
+rm -rf /usr/share/doc/* /usr/share/man/* /usr/share/info/* 2>/dev/null || true
+rm -rf /var/cache/apt/archives/*.deb /var/lib/apt/lists/* 2>/dev/null || true
+rm -rf /root/.cache/* /tmp/* 2>/dev/null || true
+# Arch 版遗留的 boost_python 兼容软链（Debian 不需要）与 pacman [offline_repo] 段一并消失：
+# Debian 无 pacman，离线预置走 apt 的本地 Packages 缓存或直接联网补齐。
+
+# ---------------------------------------------------------------- 本地化 / 时区
+say "中文本地化 / 时区 Asia/Shanghai"
+sed -i 's/^# *\(zh_CN.UTF-8 UTF-8\)/\1/' /etc/locale.gen 2>/dev/null || true
+grep -q '^zh_CN.UTF-8' /etc/locale.gen 2>/dev/null || echo 'zh_CN.UTF-8 UTF-8' >> /etc/locale.gen
+locale-gen >/dev/null 2>&1 || warn "locale-gen 失败"
+update-locale LANG=zh_CN.UTF-8 LANGUAGE=zh_CN:zh 2>/dev/null || true
+ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+echo 'Asia/Shanghai' > /etc/timezone
+dpkg-reconfigure -f noninteractive tzdata >/dev/null 2>&1 || true
+
+# ---------------------------------------------------------------- 系统标识（全白牌）
+say "系统标识：天枢"
+[ -L /etc/os-release ] && rm -f /etc/os-release
+cat > /etc/os-release <<'EOF'
+PRETTY_NAME="天枢 OS 1.0"
+NAME="天枢 OS"
+ID=tianshu
+ID_LIKE=debian
+LOGO=tianshu-logo
+VERSION="1.0 (基于 Debian)"
+VERSION_ID="1.0"
+HOME_URL="https://github.com/renji-qw/TianShu-OS"
+SUPPORT_URL="https://github.com/renji-qw/TianShu-OS/issues"
+BUG_REPORT_URL="https://github.com/renji-qw/TianShu-OS/issues"
+EOF
+[ -e /usr/lib/os-release ] && cp /etc/os-release /usr/lib/os-release 2>/dev/null || true
+
+# ---------------------------------------------------------------- tty1 自启（仅 Live 环境）
+say "tty1 自动登录（仅 Live 环境）"
+mkdir -p /etc/systemd/system/getty@tty1.service.d
+cat > /etc/systemd/system/getty@tty1.service.d/autologin.conf <<'EOF'
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin root --noclear %I $TERM
+EOF
+
+# ---------------------------------------------------------------- 预建用户 + 用户态 core 服务
+say "预建用户 tianshu + 用户态 tianshu.service"
+if ! id tianshu >/dev/null 2>&1; then
+    useradd --create-home --shell /bin/bash --user-group tianshu || warn "预建用户失败"
+fi
+# 用户单元全局启用：任何用户登录即拉起 core
+mkdir -p /etc/systemd/user/default.target.wants
+ln -sf /usr/lib/systemd/user/tianshu.service /etc/systemd/user/default.target.wants/tianshu.service
+# linger：chroot 内 systemd 未运行，直接写 systemd 的 linger 标记目录（等价 loginctl enable-linger）
+mkdir -p /var/lib/systemd/linger
+touch /var/lib/systemd/linger/tianshu
+# core 二进制由 ci-build.sh 注入 /usr/bin/tianshu_core
+if [ -x /usr/bin/tianshu_core ]; then
+    say "tianshu_core 已就位"
+else
+    warn "缺少 /usr/bin/tianshu_core，用户态服务将启动失败"
+fi
+
+say "启用系统服务"
+systemctl enable NetworkManager 2>/dev/null || warn "NetworkManager 启用失败"
+systemctl enable zramswap.service 2>/dev/null || warn "zramswap 启用失败（缺 zram-tools 时属正常）"
+systemctl enable sddm.service 2>/dev/null || true
+systemctl enable lightdm.service 2>/dev/null || true
+systemctl enable tianshu-memguard.service 2>/dev/null || warn "memguard 单元启用失败"
+systemctl enable tianshu-linger.service 2>/dev/null || warn "linger 单元启用失败"
+systemctl set-default graphical.target 2>/dev/null || true
+
+# ---------------------------------------------------------------- 开机动画（Plymouth）
+say "开机动画：天枢主题"
+# 让 initramfs 认得「天枢」二字所需的 CJK 字体
+# （Plymouth 的 Image.Text 走 pango，字体必须随 initramfs 一起进 early userspace）
+mkdir -p /etc/initramfs-tools/hooks
+cat > /etc/initramfs-tools/hooks/tianshu-plymouth-font <<'EOF'
+#!/bin/sh
+PREREQ=""
+prereqs() { echo "$PREREQ"; }
+case "$1" in
+    prereqs) prereqs; exit 0 ;;
+esac
+. /usr/share/initramfs-tools/hook-functions
+FONT=/usr/share/plymouth/themes/tianshu/tianshu-cjk.ttf
+if [ -f "$FONT" ]; then
+    mkdir -p "$DESTDIR/usr/share/fonts/truetype/tianshu"
+    cp -L "$FONT" "$DESTDIR/usr/share/fonts/truetype/tianshu/tianshu-cjk.ttf"
+fi
+if [ -f /etc/fonts/fonts.conf ]; then
+    mkdir -p "$DESTDIR/etc/fonts"
+    cp -L /etc/fonts/fonts.conf "$DESTDIR/etc/fonts/fonts.conf"
+fi
+exit 0
+EOF
+chmod 0755 /etc/initramfs-tools/hooks/tianshu-plymouth-font
+
+if command -v plymouth-set-default-theme >/dev/null 2>&1; then
+    # -R 会同时重建 initramfs；随后仍显式再跑一次 update-initramfs，两者都不能省
+    plymouth-set-default-theme -R tianshu || warn "plymouth-set-default-theme 失败"
+else
+    warn "缺 plymouth-set-default-theme，跳过开机动画设置"
+fi
+update-initramfs -u -k all 2>/dev/null || warn "update-initramfs 失败"
+
+# ---------------------------------------------------------------- 收尾清理
+say "收尾清理"
+rm -rf /var/cache/apt/archives/*.deb /tmp/* /root/.cache/* 2>/dev/null || true
+say "天枢 chroot 定制完成"
+exit 0

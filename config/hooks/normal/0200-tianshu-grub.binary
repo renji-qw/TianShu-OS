@@ -1,0 +1,44 @@
+#!/bin/sh
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 紫枢联合组织 / TianShu OS Project
+#
+# 天枢 OS — binary 阶段 hook：GRUB 菜单文案全白牌。
+# 执行时机：live-build 的 binary_grub_cfg 之后、binary_iso 之前（cwd = binary/），
+# 因此这里改的是「即将压进 ISO 的那份 grub 配置」，不是上游模板。
+set -eu
+
+[ -d boot/grub ] || exit 0
+
+for f in boot/grub/*.cfg; do
+    [ -f "$f" ] || continue
+    sed -i \
+        -e 's/Live system (autodetect) (fail-safe mode)/天枢 OS（急救模式）/g' \
+        -e 's/Live system (autodetect)/天枢 OS（自动适配）/g' \
+        -e 's/Live system (\(amd64\|686\|i386\) fail-safe mode)/天枢 OS（急救模式）/g' \
+        -e 's/Live system (\(amd64\|686\|i386\))/天枢 OS/g' \
+        -e 's/Live system, kernel \(.*\)/天枢 OS · 内核 \1/g' \
+        -e 's/Utilities\.\.\./工具…/g' \
+        -e 's/Advanced install options \.\.\./进阶安装…/g' \
+        -e 's/UEFI Firmware Settings/UEFI 固件设置/g' \
+        -e 's/Verify integrity of the boot medium/校验介质完整性/g' \
+        -e 's/Debian GNU\/Linux/天枢 OS/g' \
+        -e 's/Debian Live/天枢 OS/g' \
+        "$f"
+done
+
+# theme.txt 里上游留下的占位符（无人替换）就地白牌，避免 GRUB 显示 @KEYMAP_SHORT@
+if [ -f boot/grub/live-theme/theme.txt ]; then
+    sed -i \
+        -e 's/@KEYMAP_SHORT@/↑↓ 选择 · Enter 启动/g' \
+        -e 's/@TIMEOUT_NOTIFICATION_LONG@/天枢 OS 启动中…/g' \
+        -e 's/title-text:.*/title-text: "天枢 OS"/g' \
+        boot/grub/live-theme/theme.txt
+fi
+
+# 兜底：任何残留的 Debian 字样一律抹掉
+for f in boot/grub/*.cfg boot/grub/live-theme/*.txt; do
+    [ -f "$f" ] || continue
+    sed -i -e 's/Debian GNU\/Linux/天枢 OS/g' -e 's/\bDebian\b/天枢/g' "$f"
+done
+
+exit 0

@@ -1,0 +1,6 @@
+# 天枢 OS — 幻境版（KDE Plasma 6）追加包
+# 三阶紫罗兰 / 12px 圆角毛玻璃由 configs/kde/ 原样投放，不在此处改动视觉参数。
+kde-plasma-desktop
+kwin-wayland
+sddm
+qt6-qpa-plugins

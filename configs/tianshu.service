@@ -1,45 +1,42 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # Copyright (C) 2026 紫枢联合组织 / TianShu OS Project
-# tianshu_core v1.0.1-beta systemd unit
+# tianshu_core v2.0.0-debian-alpha —— 用户态 systemd 单元
+#
+# 机制：systemd --user 在用户首次登录时启动并管理用户服务，登出即终止；
+#       配合 loginctl enable-linger <user>（由 tianshu-linger.service 开启），
+#       未登录时用户实例也能存活。
 
 [Unit]
-Description=TianShu OS Core Engine
-After=local-fs.target
-StartLimitIntervalSec=60
-StartLimitBurst=5
+Description=TianShu Core
+After=graphical-session.target
+PartOf=graphical-session.target
 
 [Service]
 Type=simple
-User=root
-
-# 调度核心的绝对路径
 ExecStart=/usr/bin/tianshu_core
 
-# 崩溃 3 秒后自动拉起，防无限刷屏
-Restart=always
-RestartSec=3
+# 2G 硬开关与内存看门狗的判定逻辑在 memguard 内部，单元内不写死阈值
+ExecStartPost=/usr/local/bin/tianshu-memguard session
 
-# 捕获 SIGINT 以执行优雅退出
-KillSignal=SIGINT
+Restart=on-failure
+RestartSec=5
+
+# 内存上限：核心常驻，512M 足够
+MemoryHigh=256M
+MemoryMax=512M
 
 # 日志环境
 Environment=RUST_LOG=info
 Environment=TIANSHU_RESERVE_MB=64
 
-# 赋予极高的 CPU 优先级，防止系统满载时调度器被饿死
-Nice=-10
-
-# 解除物理内存锁定限制
-LimitMEMLOCK=infinity
-
-# 防爆核心转储文件
-LimitCORE=0
-
-MemoryHigh=512M
-MemoryMax=1G
+# 捕获 SIGINT 以执行优雅退出
+KillSignal=SIGINT
 
 # 进程被清理时只杀主进程
 KillMode=process
+
+# 防爆核心转储文件
+LimitCORE=0
 
 # 权限最小化加固
 NoNewPrivileges=true
@@ -48,4 +45,4 @@ ProtectHome=true
 PrivateTmp=true
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=graphical-session.target

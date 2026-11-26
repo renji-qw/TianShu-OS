@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 紫枢联合组织 / TianShu OS Project
+#
+# 天枢 OS — 轻量版内存看门狗（root）。是否真正生效由 /etc/tianshu/memguard.conf 决定。
+[Unit]
+Description=TianShu Memguard (memory watchdog)
+After=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/tianshu-memguard watchdog
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
