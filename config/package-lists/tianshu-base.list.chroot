@@ -27,7 +27,7 @@ ibus-gtk3
 network-manager
 wpasupplicant
 sudo
-polkit
+polkitd
 zram-tools
 mesa-vulkan-drivers
 fonts-noto-cjk
